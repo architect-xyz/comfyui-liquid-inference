@@ -1,0 +1,72 @@
+[project]
+classifiers = ["Operating System :: OS Independent"]
+description = "Generate images in ComfyUI with Liquid Inference, an auction exchange for inference. Each run is a paid request with a price cap."
+license = { file = "LICENSE" }
+name = "liquid-inference"
+readme = "README.md"
+requires-python = ">=3.10"
+version = "0.1.0"
+# ComfyUI already installs numpy, Pillow and torch, and HTTP uses only the
+# standard library. A dependency here could change a package that ComfyUI pins.
+dependencies = []
+
+[project.urls]
+"Bug Tracker" = "https://github.com/architect-xyz/comfyui-liquid-inference/issues"
+Documentation = "https://github.com/architect-xyz/comfyui-liquid-inference#readme"
+Repository = "https://github.com/architect-xyz/comfyui-liquid-inference"
+
+[tool.comfy]
+DisplayName = "Liquid Inference"
+Icon = ""
+PublisherId = "liquid-inference"
+includes = []
+
+[dependency-groups]
+dev = ["mypy>=1.18", "numpy>=1.25", "pillow>=10", "pytest>=8.4", "ruff>=0.14"]
+
+[tool.uv]
+package = false
+
+# Empty, so that uv does not attach this project to a workspace in a parent
+# folder.
+[tool.uv.workspace]
+members = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# S102 and S307 ban `exec` and `eval`. The Comfy Registry scan refuses them.
+select = ["B", "E", "F", "I", "N", "RUF", "SIM", "UP", "W", "S102", "S307"]
+
+[tool.ruff.lint.per-file-ignores]
+# The folder name is the install name that ComfyUI chooses, which can have a
+# hyphen. ComfyUI imports the folder by path, so the name does not matter.
+"__init__.py" = ["N999"]
+
+[tool.ruff.lint.pep8-naming]
+# ComfyUI calls these names on a node class.
+extend-ignore-names = ["INPUT_TYPES", "VALIDATE_INPUTS"]
+
+[tool.mypy]
+files = ["liquid_inference", "tests"]
+python_version = "3.10"
+strict = true
+# Module names start at this folder, because its own name is not a valid
+# package name.
+explicit_package_bases = true
+mypy_path = ".:tests"
+
+[[tool.mypy.overrides]]
+# ComfyUI supplies these modules at runtime.
+ignore_missing_imports = true
+module = ["aiohttp", "aiohttp.*", "folder_paths", "server", "torch"]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not smoke'"
+markers = [
+  "smoke: start a real ComfyUI; slow, and needs the network to install it",
+]
+pythonpath = ["."]
+testpaths = ["tests"]
