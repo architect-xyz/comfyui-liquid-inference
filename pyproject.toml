@@ -17,7 +17,9 @@ Repository = "https://github.com/architect-xyz/comfyui-liquid-inference"
 
 [tool.comfy]
 DisplayName = "Liquid Inference"
-Icon = ""
+# A PNG, because GitHub serves an SVG file as text, and a browser does not show
+# it as an image.
+Icon = "https://raw.githubusercontent.com/architect-xyz/comfyui-liquid-inference/main/icon.png"
 PublisherId = "liquid-inference"
 includes = []
 
