@@ -5,7 +5,7 @@ license = { file = "LICENSE" }
 name = "liquid-inference"
 readme = "README.md"
 requires-python = ">=3.10"
-version = "0.1.0"
+version = "0.1.1"
 # ComfyUI already installs numpy, Pillow and torch, and HTTP uses only the
 # standard library. A dependency here could change a package that ComfyUI pins.
 dependencies = []
