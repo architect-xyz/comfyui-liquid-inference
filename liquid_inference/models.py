@@ -4,6 +4,9 @@ ComfyUI reads the inputs of a node each time it serves `/object_info` and
 each time it checks a queued workflow. A network call there blocks ComfyUI.
 Thus the catalog returns the last list at once and gets a new list in a
 background thread. It waits for the network only when it has no list at all.
+
+Each list belongs to the router that sent it. The catalog never returns the
+list of a different router, from memory or from the cache file.
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +31,19 @@ MAX_AGE = 60.0
 class ImageModel:
     id: str
     sizes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _Listing:
+    base_url: str
+    models: list[ImageModel]
+
+
+class Router(Protocol):
+    @property
+    def base_url(self) -> str: ...
+
+    def list_models(self, timeout: float) -> list[dict[str, Any]]: ...
 
 
 def image_models(cards: list[dict[str, Any]]) -> list[ImageModel]:
@@ -63,37 +79,44 @@ def _area(size: str) -> tuple[int, int, str]:
 class Catalog:
     def __init__(
         self,
-        fetch: Callable[[float], list[dict[str, Any]]],
+        router: Callable[[], Router],
         cache_file: Path | None,
         *,
         max_age: float = MAX_AGE,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        self._fetch = fetch
+        self._router = router
         self._cache_file = cache_file
         self._max_age = max_age
         self._clock = clock
         self._lock = threading.Lock()
-        self._models: list[ImageModel] | None = None
-        self._tried_at: float | None = None
+        self._listing: _Listing | None = None
+        self._tried: tuple[str, float] | None = None
         self._refresh: threading.Thread | None = None
 
     def models(self) -> list[ImageModel]:
-        """The last list, or an empty list when there is none."""
+        """The last list from the current router, or an empty list when there is none."""
+        router = self._router()
         with self._lock:
-            if self._models is None:
-                self._models = self._read_cache()
-            if self._models is None:
-                if self._tried_at is None or self._stale():
-                    self._models = self._try_fetch()
-                return list(self._models or [])
-            if self._stale() and (self._refresh is None or not self._refresh.is_alive()):
-                self._tried_at = self._clock()
+            listing = self._listing
+            if listing is None or listing.base_url != router.base_url:
+                listing = self._listing = self._read_cache(router.base_url)
+            if listing is None:
+                if self._stale(router.base_url):
+                    listing = self._listing = self._try_fetch(router)
+                return list(listing.models) if listing else []
+            if self._stale(router.base_url) and (
+                self._refresh is None or not self._refresh.is_alive()
+            ):
+                self._tried = (router.base_url, self._clock())
                 self._refresh = threading.Thread(
-                    target=self._refresh_in_background, name="liquid-models", daemon=True
+                    target=self._refresh_in_background,
+                    args=(router,),
+                    name="liquid-models",
+                    daemon=True,
                 )
                 self._refresh.start()
-            return list(self._models)
+            return list(listing.models)
 
     def wait(self) -> None:
         """Waits for a background refresh to stop. For tests."""
@@ -101,43 +124,51 @@ class Catalog:
         if refresh is not None:
             refresh.join()
 
-    def _stale(self) -> bool:
-        return self._tried_at is None or self._clock() - self._tried_at >= self._max_age
+    def _stale(self, base_url: str) -> bool:
+        if self._tried is None or self._tried[0] != base_url:
+            return True
+        return self._clock() - self._tried[1] >= self._max_age
 
-    def _refresh_in_background(self) -> None:
-        models = self._try_fetch()
-        if models is not None:
+    def _refresh_in_background(self, router: Router) -> None:
+        listing = self._try_fetch(router)
+        if listing is not None:
             with self._lock:
-                self._models = models
+                self._listing = listing
 
-    def _try_fetch(self) -> list[ImageModel] | None:
-        self._tried_at = self._clock()
+    def _try_fetch(self, router: Router) -> _Listing | None:
+        self._tried = (router.base_url, self._clock())
         try:
-            models = image_models(self._fetch(FETCH_TIMEOUT))
+            listing = _Listing(router.base_url, image_models(router.list_models(FETCH_TIMEOUT)))
         except Exception as error:
             log.warning("liquid inference: failed to get the model list: %s", error)
             return None
-        self._write_cache(models)
-        return models
+        self._write_cache(listing)
+        return listing
 
-    def _read_cache(self) -> list[ImageModel] | None:
+    def _read_cache(self, base_url: str) -> _Listing | None:
         if self._cache_file is None:
             return None
         try:
             cached = json.loads(self._cache_file.read_text(encoding="utf-8"))
-            return [ImageModel(m["id"], tuple(m["sizes"])) for m in cached["models"]]
+            if cached.get("base_url") != base_url:
+                return None
+            models = [ImageModel(m["id"], tuple(m["sizes"])) for m in cached["models"]]
+            return _Listing(base_url, models)
         except FileNotFoundError:
             return None
-        except (ValueError, KeyError, TypeError) as error:
+        except (ValueError, KeyError, TypeError, AttributeError) as error:
             log.warning("liquid inference: ignored an unreadable model cache: %s", error)
             return None
 
-    def _write_cache(self, models: list[ImageModel]) -> None:
+    def _write_cache(self, listing: _Listing) -> None:
         if self._cache_file is None:
             return
         try:
             self._cache_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            payload = {"models": [{"id": m.id, "sizes": list(m.sizes)} for m in models]}
+            payload = {
+                "base_url": listing.base_url,
+                "models": [{"id": m.id, "sizes": list(m.sizes)} for m in listing.models],
+            }
             temporary = self._cache_file.with_suffix(".tmp")
             temporary.write_text(json.dumps(payload), encoding="utf-8")
             temporary.replace(self._cache_file)

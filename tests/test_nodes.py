@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from stub_router import Stub
+from stub_router import Stub, dead_base
 
 from liquid_inference import __version__, nodes
 from liquid_inference.client import Client
@@ -20,7 +20,7 @@ def node(router: Stub, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> nodes
     # torch is large, and the node only calls `torch.from_numpy`.
     monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(from_numpy=lambda a: a))
     client = Client(f"{router.base}/v1", KEY)
-    catalog = Catalog(client.list_models, tmp_path / "models.json")
+    catalog = Catalog(lambda: client, tmp_path / "models.json")
     monkeypatch.setattr(nodes, "_client", lambda: client)
     monkeypatch.setattr(nodes, "_catalog", lambda: catalog)
     return nodes.LiquidImage()
@@ -52,10 +52,8 @@ def test_the_inputs_list_the_image_models_and_their_sizes(node: nodes.LiquidImag
 def test_with_no_list_the_model_input_shows_a_placeholder(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def fail(timeout: float) -> list[dict[str, Any]]:
-        raise OSError("down")
-
-    monkeypatch.setattr(nodes, "_catalog", lambda: Catalog(fail, tmp_path / "m.json"))
+    client = Client(dead_base(), KEY)
+    monkeypatch.setattr(nodes, "_catalog", lambda: Catalog(lambda: client, tmp_path / "m.json"))
     assert widgets()["model"][0] == [nodes.NO_MODELS]
     assert nodes.LiquidImage.VALIDATE_INPUTS(nodes.NO_MODELS, "auto") is not True
 

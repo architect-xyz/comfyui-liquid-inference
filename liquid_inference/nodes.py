@@ -23,10 +23,7 @@ def _client() -> Client:
 
 @cache
 def _catalog() -> Catalog:
-    return Catalog(
-        lambda timeout: _client().list_models(timeout),
-        comfy_config().directory / "image_models.json",
-    )
+    return Catalog(_client, comfy_config().directory / "image_models.json")
 
 
 class LiquidImage:

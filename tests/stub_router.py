@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import socket
 import threading
 import time
 from collections.abc import Iterator
@@ -150,3 +151,10 @@ def serve(stub: Stub | None = None) -> Iterator[Stub]:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def dead_base() -> str:
+    """A base URL with no server behind it."""
+    with socket.socket() as reserved:
+        reserved.bind(("127.0.0.1", 0))
+        return f"http://127.0.0.1:{reserved.getsockname()[1]}/v1"
