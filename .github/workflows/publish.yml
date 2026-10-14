@@ -23,11 +23,29 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME does not match version $version"
             exit 1
           fi
-      - uses: Comfy-Org/publish-node-action@7578cdb0c1410f2515e6f9b1443c6859cab94f05 # 1.0.1
-        with:
-          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
-          skip_checkout: "true"
+      # The section of CHANGELOG.md for this version is the changelog of the
+      # Registry version and the body of the GitHub release.
+      - name: the changelog of this version
+        run: |
+          python3 - "${GITHUB_REF_NAME#v}" > "$RUNNER_TEMP/notes.md" <<'EOF'
+          import re, sys
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          version = re.escape(sys.argv[1])
+          match = re.search(rf"^## {version}( [^\n]*)?$\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+          if not match or not match.group(2).strip():
+              sys.exit(f"CHANGELOG.md has no entries for {sys.argv[1]}")
+          print(match.group(2).strip())
+          EOF
+      # comfy-cli is pinned, because a new release can drop an option. Version
+      # 1.22.0 dropped `--yes`, and the publish action, which installs the
+      # newest comfy-cli, failed for v0.1.0.
+      - name: Comfy Registry
+        env:
+          REGISTRY_ACCESS_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+        run: |
+          pip install comfy-cli==1.22.0
+          comfy --skip-prompt node publish --token "$REGISTRY_ACCESS_TOKEN" --changelog-file "$RUNNER_TEMP/notes.md"
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --notes-file "$RUNNER_TEMP/notes.md" --title "$GITHUB_REF_NAME"
