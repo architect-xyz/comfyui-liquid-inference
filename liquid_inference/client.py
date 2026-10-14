@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 import binascii
+import html
 import json
+import re
 import socket
 import urllib.error
 import urllib.request
@@ -21,6 +23,10 @@ USER_AGENT = f"liquid-comfyui/{__version__}"
 GENERATION_TIMEOUT = 300.0
 MAX_IMAGE_BYTES = 64 * 1024 * 1024
 JOB_HEADER = "x-liquid-job-id"
+# Codes that say that no seller can serve the selected model now. The model
+# list of the node is from when the page loaded, so it can be old.
+MODEL_LIST_CODES = frozenset({"model_not_found", "model_unavailable"})
+_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
 
 class LiquidError(RuntimeError):
@@ -114,7 +120,7 @@ class Client:
         except urllib.error.HTTPError as error:
             body = error.read()
             raise LiquidError(
-                refusal_message(error.code, body, error.headers.get(JOB_HEADER))
+                refusal_message(error.code, body, error.headers.get(JOB_HEADER), idempotency_key)
             ) from None
         except urllib.error.URLError as error:
             if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror)):
@@ -215,15 +221,25 @@ def format_usd(amount: float) -> str:
     return f"{amount:.9f}".rstrip("0").rstrip(".")
 
 
-def refusal_message(status: int, body: bytes, job_id: str | None) -> str:
+def refusal_message(
+    status: int, body: bytes, job_id: str | None, idempotency_key: str | None = None
+) -> str:
     """Makes one readable line from an error answer of the router."""
     try:
         error = json.loads(body).get("error")
     except (ValueError, AttributeError):
         error = None
     if not isinstance(error, dict):
-        text = body.decode("utf-8", "replace").strip()[:300]
-        message = f"Liquid Inference answered HTTP {status}: {text or 'no body'}"
+        # A proxy in front of the router, such as Cloudflare, can replace the
+        # router's answer with its own page. The page does not tell whether
+        # the job ran.
+        message = (
+            f"Liquid Inference answered HTTP {status} with {_describe(body)}, not with an "
+            "error from the exchange. A proxy between ComfyUI and the exchange can send such "
+            "a page. The job can have run. Look at your receipts before you run the node again"
+        )
+        if idempotency_key:
+            message += f". Idempotency-Key: {idempotency_key}"
     else:
         code = error.get("code") or "error"
         message = f"Liquid Inference refused the request (HTTP {status}, {code}): "
@@ -233,9 +249,25 @@ def refusal_message(status: int, body: bytes, job_id: str | None) -> str:
         reasons = _exclusions(error.get("eligibility"))
         if reasons:
             message += f". Offers excluded: {reasons}"
+        if code in MODEL_LIST_CODES:
+            message += ". Reload the page to get the current model list"
     if job_id:
         message += f". Job ID: {job_id}"
     return message
+
+
+def _describe(body: bytes) -> str:
+    """Names a body that is not JSON in a few words, not as a page of HTML."""
+    text = body.decode("utf-8", "replace").strip()
+    if not text:
+        return "no body"
+    title = _TITLE.search(text)
+    if title:
+        name = " ".join(html.unescape(title.group(1)).split())[:120]
+        return f'a web page titled "{name}"' if name else "a web page"
+    if text.startswith("<"):
+        return "a web page"
+    return f'"{" ".join(text.split())[:200]}"'
 
 
 def _exclusions(eligibility: object, limit: int = 8) -> str:

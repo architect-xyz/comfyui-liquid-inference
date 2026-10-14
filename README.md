@@ -110,6 +110,10 @@ to support to find the job.
 | HTTP 400 `unsupported_parameter` | No offer for the model accepts a value that you sent, usually `size`. Set `size` to `auto`, or select a different model. |
 | HTTP 503 `no_eligible_offer` with `cap_exceeds_buyer_cap` | Each offer costs more than `cap_usd`. Increase `cap_usd`. |
 | HTTP 503 `no_eligible_offer`, other reasons | No seller can take the request now. Try again later, or select a different model. |
+| HTTP 404 `model_not_found` | No seller lists the model now. Reload the page to get the current model list, then select a model. |
+| HTTP 503 `model_unavailable` | The model has sellers, but none of them can take a job now. Try again in a minute, or reload the page and select a different model. |
+| HTTP 503 `provider_failed` | The seller failed before it made an image, and you were not charged. Run the node again. If no other seller has the model, the next run gets `model_unavailable`. |
+| HTTP 502 or 504 with a web page | A proxy between ComfyUI and the exchange answered. Look at your receipts before you run the node again. |
 | The model list shows "no image models" | ComfyUI could not get the model list. Check the network and the base URL, then reload the page. |
 | The outcome is unknown | Do not run the node again at once. Look at your receipts, or give the `Idempotency-Key` to support. |
 

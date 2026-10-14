@@ -41,6 +41,13 @@ IMAGE_CARDS: list[dict[str, Any]] = [
     {"id": "liquid.auto", "object": "model", "match_type": "router"},
 ]
 
+# The start of the page that Cloudflare sends in place of a 502 from the origin.
+CLOUDFLARE_502 = b"""<!DOCTYPE html>
+<html class="no-js" lang="en-US"><head>
+<title>router.inference.ai.exchange | 502: Bad gateway</title>
+<meta charset="UTF-8" /><style>body{margin:0}</style>
+</head><body><div id="cf-wrapper"><h1>Bad gateway</h1></div></body></html>"""
+
 
 @dataclass
 class Recorded:
@@ -59,7 +66,7 @@ class Stub:
 
     base: str = ""
     cards: list[dict[str, Any]] = field(default_factory=lambda: list(IMAGE_CARDS))
-    # "b64", "url" or "error".
+    # "b64", "url", "error" or "page".
     mode: str = "b64"
     status: int = 200
     error: dict[str, Any] = field(default_factory=dict)
@@ -113,6 +120,10 @@ def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
             job = {"x-liquid-job-id": "job-stub-1"}
             if stub.mode == "error":
                 self._send(stub.status, json.dumps(stub.error).encode(), "application/json", job)
+                return
+            if stub.mode == "page":
+                # A proxy in front of the router replaced its answer.
+                self._send(stub.status, CLOUDFLARE_502, "text/html; charset=UTF-8", {})
                 return
             count = int(request.json().get("n", 1))
             if stub.mode == "url":
