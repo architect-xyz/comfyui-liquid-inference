@@ -30,8 +30,16 @@ from stub_router import Stub, serve
 
 PACKAGE = Path(__file__).resolve().parents[2]
 WORKFLOWS = sorted((PACKAGE / "example_workflows").glob("*.json"))
+IMAGE_WORKFLOWS = [p for p in WORKFLOWS if '"LiquidImage"' in p.read_text()]
+VIDEO_WORKFLOWS = [p for p in WORKFLOWS if '"LiquidVideo"' in p.read_text()]
+# A real MP4 of 8 frames, so that Save Video can read it.
+CLIP = (PACKAGE / "tests" / "fixtures" / "clip.mp4").read_bytes()
 SENTINEL = "lq_smoke_sentinel_" + uuid.uuid4().hex
 WIDGET_TYPES = {"INT", "FLOAT", "STRING", "BOOLEAN", "COMBO"}
+# A combo whose value adds inputs, such as `format` of Save Video. The API
+# names an added input `<combo>.<input>`.
+DYNAMIC_COMBO = "COMFY_DYNAMICCOMBO_V3"
+LIQUID_NODES = {"LiquidImage", "LiquidVideo"}
 
 pytestmark = pytest.mark.smoke
 
@@ -83,12 +91,26 @@ def to_api(workflow: dict[str, Any], object_info: dict[str, Any]) -> dict[str, A
             if name in linked:
                 link = links[linked[name]]
                 inputs[name] = [str(link[1]), link[2]]
+            elif kind == DYNAMIC_COMBO and not options.get("hidden"):
+                inputs.update(_dynamic(name, options, values))
             elif isinstance(kind, list) or kind in WIDGET_TYPES:
                 inputs[name] = values.pop(0)
                 if options.get("control_after_generate"):
                     values.pop(0)
         prompt[str(node["id"])] = {"class_type": node["type"], "inputs": inputs}
     return prompt
+
+
+def _dynamic(name: str, options: dict[str, Any], values: list[Any]) -> dict[str, Any]:
+    key = values.pop(0)
+    inputs = {name: key}
+    (option,) = [o for o in options["options"] if o["key"] == key]
+    for sub, spec in option["inputs"].get("required", {}).items():
+        if spec[0] == DYNAMIC_COMBO:
+            inputs.update(_dynamic(f"{name}.{sub}", spec[1], values))
+        else:
+            inputs[f"{name}.{sub}"] = values.pop(0)
+    return inputs
 
 
 @pytest.fixture(scope="module")
@@ -161,6 +183,10 @@ def test_the_node_loads_without_import_errors(comfyui: tuple[str, Path, Path, St
     info = get(f"{base}/object_info/LiquidImage")["LiquidImage"]
     assert info["display_name"] == "Liquid Image (paid API)"
     assert "blackforestlabs/flux-schnell" in info["input"]["required"]["model"][0]
+    info = get(f"{base}/object_info/LiquidVideo")["LiquidVideo"]
+    assert info["output"] == ["VIDEO", "STRING", "STRING"]
+    assert "google/veo-3.1" in info["input"]["required"]["model"][0]
+    assert "LiquidVideoJob" in get(f"{base}/object_info")
     log = (run_dir / "comfyui.log").read_text()
     assert "IMPORT FAILED" not in log, log
     with urllib.request.urlopen(f"{base}/extensions/liquid-inference/liquid.js") as script:
@@ -200,12 +226,16 @@ def example(base: str, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = json.loads(text)
     prompt = to_api(workflow, get(f"{base}/object_info"))
     for node in prompt.values():
-        if node["class_type"] == "LiquidImage":
+        if node["class_type"] in LIQUID_NODES:
             node["inputs"]["prompt"] += f" ({path.stem})"
     return workflow, prompt
 
 
-@pytest.mark.parametrize("path", WORKFLOWS, ids=[p.stem for p in WORKFLOWS])
+def assert_no_key(path: Path) -> None:
+    assert SENTINEL not in path.read_bytes().decode("latin-1"), path
+
+
+@pytest.mark.parametrize("path", IMAGE_WORKFLOWS, ids=[p.stem for p in IMAGE_WORKFLOWS])
 def test_an_example_workflow_saves_images_without_the_key(
     comfyui: tuple[str, Path, Path, Stub], path: Path
 ) -> None:
@@ -234,7 +264,39 @@ def test_an_example_workflow_saves_images_without_the_key(
         assert "workflow" in chunks
         for value in chunks.values():
             assert SENTINEL not in value
-        assert SENTINEL not in image_path.read_bytes().decode("latin-1")
+        assert_no_key(image_path)
+
+
+@pytest.mark.parametrize("path", VIDEO_WORKFLOWS, ids=[p.stem for p in VIDEO_WORKFLOWS])
+@pytest.mark.parametrize("retention_policy", [None, "none", "allowed"])
+def test_an_example_workflow_saves_a_video_without_the_key(
+    comfyui: tuple[str, Path, Path, Stub], path: Path, retention_policy: str | None
+) -> None:
+    base, output, _, stub = comfyui
+    stub.contents = [(200, CLIP)]
+    workflow, prompt = example(base, path)
+    for node in prompt.values():
+        if node["class_type"] == "LiquidVideo":
+            if retention_policy is None:
+                node["inputs"].pop("retention_policy")
+            else:
+                node["inputs"]["retention_policy"] = retention_policy
+    before = set(output.rglob("*.mp4"))
+    posts_before = len(stub.calls("/v1/videos"))
+    status = queue(base, prompt, workflow)
+    assert status["status_str"] == "success", json.dumps(status)
+
+    (create,) = stub.calls("/v1/videos")[posts_before:]
+    assert create.headers["authorization"] == f"Bearer {SENTINEL}"
+    assert create.headers["x-liquid-cap-usd"] == "1"
+    assert create.json()["exchange"]["retention_policy"] == (retention_policy or "none")
+    starts = any(node["type"] == "LoadImage" for node in workflow["nodes"])
+    assert ("input_reference" in create.json()) == starts
+
+    (written,) = set(output.rglob("*.mp4")) - before
+    # Save Video writes the workflow into the file's metadata.
+    assert b"workflow" in written.read_bytes()
+    assert_no_key(written)
 
 
 def test_a_second_queue_with_the_same_inputs_does_not_buy_again(

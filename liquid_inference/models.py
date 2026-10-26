@@ -1,4 +1,4 @@
-"""The list of image models for the `model` and `size` inputs.
+"""The lists of image and video models for the `model`, `size` and `seconds` inputs.
 
 ComfyUI reads the inputs of a node each time it serves `/object_info` and
 each time it checks a queued workflow. A network call there blocks ComfyUI.
@@ -15,14 +15,15 @@ import json
 import logging
 import threading
 import time
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Generic, Protocol, TypeVar
 
 log = logging.getLogger(__name__)
 
 IMAGE_KIND = "image_generation"
+VIDEO_KIND = "video_generation"
 FETCH_TIMEOUT = 5.0
 MAX_AGE = 60.0
 
@@ -34,9 +35,21 @@ class ImageModel:
 
 
 @dataclass(frozen=True)
-class _Listing:
+class VideoModel:
+    id: str
+    sizes: tuple[str, ...]
+    seconds: tuple[int, ...]
+    # True when an offer for the model reads an image input.
+    start_image: bool
+
+
+M = TypeVar("M", ImageModel, VideoModel)
+
+
+@dataclass(frozen=True)
+class _Listing(Generic[M]):
     base_url: str
-    models: list[ImageModel]
+    models: list[M]
 
 
 class Router(Protocol):
@@ -44,6 +57,13 @@ class Router(Protocol):
     def base_url(self) -> str: ...
 
     def list_models(self, timeout: float) -> list[dict[str, Any]]: ...
+
+    def list_video_models(self, timeout: float) -> list[dict[str, Any]]: ...
+
+
+class _Sized(Protocol):
+    @property
+    def sizes(self) -> tuple[str, ...]: ...
 
 
 def image_models(cards: list[dict[str, Any]]) -> list[ImageModel]:
@@ -58,7 +78,50 @@ def image_models(cards: list[dict[str, Any]]) -> list[ImageModel]:
     return models
 
 
-def size_choices(models: list[ImageModel]) -> list[str]:
+def video_models(entries: list[dict[str, Any]]) -> list[VideoModel]:
+    """Reads the entries of `GET /exchange/models?kind=video`.
+
+    Each list of an entry is the union across the offers for the model.
+    """
+    models = []
+    for entry in entries:
+        model_id = entry.get("model")
+        if entry.get("kind") != VIDEO_KIND or not isinstance(model_id, str):
+            continue
+        output = _modality(entry.get("output_modalities"), "video") or {}
+        sizes = output.get("sizes")
+        seconds = output.get("seconds")
+        models.append(
+            VideoModel(
+                model_id,
+                tuple(s for s in sizes if isinstance(s, str)) if isinstance(sizes, list) else (),
+                # bool is a subclass of int, and JSON `true` is not a length.
+                tuple(s for s in seconds if type(s) is int) if isinstance(seconds, list) else (),
+                _modality(entry.get("input_modalities"), "image") is not None,
+            )
+        )
+    return models
+
+
+def _modality(modalities: object, kind: str) -> dict[str, Any] | None:
+    if isinstance(modalities, list):
+        for modality in modalities:
+            if isinstance(modality, dict) and modality.get("type") == kind:
+                return modality
+    return None
+
+
+def seconds_choices(models: Sequence[VideoModel]) -> list[str]:
+    """Returns "auto" and then each length that a model lists, shortest first.
+
+    "auto" omits `seconds`, and the exchange then uses the shortest length
+    that an offer declares.
+    """
+    seconds = {length for model in models for length in model.seconds}
+    return ["auto", *(str(length) for length in sorted(seconds))]
+
+
+def size_choices(models: Sequence[_Sized]) -> list[str]:
     """Returns "auto" and then each size that a model lists, smallest first.
 
     "auto" omits `size` from the request, so each seller uses its default.
@@ -76,25 +139,43 @@ def _area(size: str) -> tuple[int, int, str]:
     return (1, 0, size)
 
 
-class Catalog:
+@dataclass(frozen=True)
+class Kind(Generic[M]):
+    """Where a catalog gets its list, and the type of each entry."""
+
+    model: type[M]
+    fetch: Callable[[Router, float], list[M]]
+
+
+IMAGES = Kind(ImageModel, lambda router, timeout: image_models(router.list_models(timeout)))
+VIDEOS = Kind(VideoModel, lambda router, timeout: video_models(router.list_video_models(timeout)))
+
+
+def _tuple(value: Any) -> Any:
+    return tuple(value) if isinstance(value, list) else value
+
+
+class Catalog(Generic[M]):
     def __init__(
         self,
         router: Callable[[], Router],
         cache_file: Path | None,
+        kind: Kind[M],
         *,
         max_age: float = MAX_AGE,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._router = router
+        self._kind: Kind[M] = kind
         self._cache_file = cache_file
         self._max_age = max_age
         self._clock = clock
         self._lock = threading.Lock()
-        self._listing: _Listing | None = None
+        self._listing: _Listing[M] | None = None
         self._tried: tuple[str, float] | None = None
         self._refresh: threading.Thread | None = None
 
-    def models(self) -> list[ImageModel]:
+    def models(self) -> list[M]:
         """The last list from the current router, or an empty list when there is none."""
         router = self._router()
         with self._lock:
@@ -135,24 +216,27 @@ class Catalog:
             with self._lock:
                 self._listing = listing
 
-    def _try_fetch(self, router: Router) -> _Listing | None:
+    def _try_fetch(self, router: Router) -> _Listing[M] | None:
         self._tried = (router.base_url, self._clock())
         try:
-            listing = _Listing(router.base_url, image_models(router.list_models(FETCH_TIMEOUT)))
+            listing = _Listing(router.base_url, self._kind.fetch(router, FETCH_TIMEOUT))
         except Exception as error:
             log.warning("liquid inference: failed to get the model list: %s", error)
             return None
         self._write_cache(listing)
         return listing
 
-    def _read_cache(self, base_url: str) -> _Listing | None:
+    def _read_cache(self, base_url: str) -> _Listing[M] | None:
         if self._cache_file is None:
             return None
         try:
             cached = json.loads(self._cache_file.read_text(encoding="utf-8"))
             if cached.get("base_url") != base_url:
                 return None
-            models = [ImageModel(m["id"], tuple(m["sizes"])) for m in cached["models"]]
+            # JSON has no tuples, and the model types hold tuples.
+            models = [
+                self._kind.model(**{k: _tuple(v) for k, v in m.items()}) for m in cached["models"]
+            ]
             return _Listing(base_url, models)
         except FileNotFoundError:
             return None
@@ -160,14 +244,14 @@ class Catalog:
             log.warning("liquid inference: ignored an unreadable model cache: %s", error)
             return None
 
-    def _write_cache(self, listing: _Listing) -> None:
+    def _write_cache(self, listing: _Listing[M]) -> None:
         if self._cache_file is None:
             return
         try:
             self._cache_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             payload = {
                 "base_url": listing.base_url,
-                "models": [{"id": m.id, "sizes": list(m.sizes)} for m in listing.models],
+                "models": [asdict(m) for m in listing.models],
             }
             temporary = self._cache_file.with_suffix(".tmp")
             temporary.write_text(json.dumps(payload), encoding="utf-8")

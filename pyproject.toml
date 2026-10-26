@@ -1,6 +1,6 @@
 [project]
 classifiers = ["Operating System :: OS Independent"]
-description = "Generate images in ComfyUI with Liquid Inference, an auction exchange for inference. Each run is a paid request with a price cap."
+description = "Generate images and videos in ComfyUI with Liquid Inference, an auction exchange for inference. Each run is a paid request with a price cap."
 license = { file = "LICENSE" }
 name = "liquid-inference"
 readme = "README.md"
@@ -22,6 +22,8 @@ DisplayName = "Liquid Inference"
 Icon = "https://raw.githubusercontent.com/architect-xyz/comfyui-liquid-inference/main/icon.png"
 PublisherId = "liquid-inference"
 includes = []
+# VIDEO outputs came in 0.3.31, and node functions that are async in 0.3.45.
+requires-comfyui = ">=0.3.45"
 
 [dependency-groups]
 dev = ["mypy>=1.18", "numpy>=1.25", "pillow>=10", "pytest>=8.4", "ruff>=0.14"]
@@ -63,7 +65,17 @@ mypy_path = ".:tests"
 [[tool.mypy.overrides]]
 # ComfyUI supplies these modules at runtime.
 ignore_missing_imports = true
-module = ["aiohttp", "aiohttp.*", "folder_paths", "server", "torch"]
+module = [
+  "aiohttp",
+  "aiohttp.*",
+  "comfy",
+  "comfy.*",
+  "comfy_api",
+  "comfy_api.*",
+  "folder_paths",
+  "server",
+  "torch",
+]
 
 [tool.pytest.ini_options]
 addopts = "-m 'not smoke'"

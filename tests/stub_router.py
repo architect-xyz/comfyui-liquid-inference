@@ -41,6 +41,58 @@ IMAGE_CARDS: list[dict[str, Any]] = [
     {"id": "liquid.auto", "object": "model", "match_type": "router"},
 ]
 
+# The entries of `GET /v1/exchange/models?kind=video`, keyed by `model`.
+VIDEO_ENTRIES: list[dict[str, Any]] = [
+    {
+        "model": "google/veo-3.1",
+        "kind": "video_generation",
+        "input_modalities": [{"type": "image", "formats": ["image/png"]}],
+        "output_modalities": [
+            {"type": "video", "sizes": ["1920x1080", "1280x720"], "seconds": [8, 4]}
+        ],
+    },
+    {
+        "model": "kling/kling-2.5",
+        "kind": "video_generation",
+        "input_modalities": [],
+        "output_modalities": [{"type": "video", "seconds": [5, 10]}],
+    },
+    {"model": "openai/gpt-image", "kind": "image_generation"},
+]
+
+VIDEO_JOB = "job_video_1"
+# Not a real MP4. The unit tests only pass the bytes along.
+CLIP = b"\x00\x00\x00\x18ftypmp42stub-clip"
+
+
+def video_status(status: str = "completed", **fields: Any) -> dict[str, Any]:
+    answer: dict[str, Any] = {
+        "id": VIDEO_JOB,
+        "object": "video",
+        "model": "google/veo-3.1",
+        "status": status,
+        "progress": 100 if status == "completed" else 0,
+        "seconds": "4",
+        "size": "1280x720",
+        "expires_at": 1_900_000_000 if status == "completed" else None,
+        "error": None,
+    }
+    if status != "in_progress":
+        answer["exchange"] = {
+            "job_id": VIDEO_JOB,
+            "provider_slug": "stub-seller",
+            "status": "settled",
+            "charge": {"cap_usd": 0.8, "total_usd": 0.8 if status == "completed" else 0.0},
+            "addressing": {"served_model": "google/veo-3.1-fast"},
+        }
+    answer.update(fields)
+    return answer
+
+
+def video_error(code: str, status: int = 503) -> tuple[int, bytes]:
+    return status, json.dumps({"error": {"code": code, "message": code}}).encode()
+
+
 # The start of the page that Cloudflare sends in place of a 502 from the origin.
 CLOUDFLARE_502 = b"""<!DOCTYPE html>
 <html class="no-js" lang="en-US"><head>
@@ -72,10 +124,25 @@ class Stub:
     error: dict[str, Any] = field(default_factory=dict)
     delay: float = 0.0
     image: bytes = field(default_factory=png)
+    video_entries: list[dict[str, Any]] = field(default_factory=lambda: list(VIDEO_ENTRIES))
+    # Each read of the job takes the next answer. The last answer repeats.
+    statuses: list[tuple[int, bytes]] = field(
+        default_factory=lambda: [(200, json.dumps(video_status()).encode())]
+    )
+    contents: list[tuple[int, bytes]] = field(default_factory=lambda: [(200, CLIP)])
     requests: list[Recorded] = field(default_factory=list)
 
     def calls(self, path: str) -> list[Recorded]:
         return [r for r in self.requests if r.path == path]
+
+    def answer_statuses(self, *answers: dict[str, Any] | tuple[int, bytes]) -> None:
+        self.statuses = [
+            a if isinstance(a, tuple) else (200, json.dumps(a).encode()) for a in answers
+        ]
+
+
+def _next(answers: list[tuple[int, bytes]]) -> tuple[int, bytes]:
+    return answers.pop(0) if len(answers) > 1 else answers[0]
 
 
 def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
@@ -107,6 +174,16 @@ def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
                 self._send(200, body, "application/json", {})
             elif self.path == "/files/image.png":
                 self._send(200, stub.image, "image/png", {})
+            elif self.path == "/v1/exchange/models?kind=video":
+                body = json.dumps(stub.video_entries).encode()
+                self._send(200, body, "application/json", {})
+            elif self.path == f"/v1/videos/{VIDEO_JOB}":
+                status, body = _next(stub.statuses)
+                self._send(status, body, "application/json", {})
+            elif self.path == f"/v1/videos/{VIDEO_JOB}/content":
+                status, body = _next(stub.contents)
+                kind = "video/mp4" if status == 200 else "application/json"
+                self._send(status, body, kind, {})
             else:
                 self._send(404, b"{}", "application/json", {})
 
@@ -114,6 +191,9 @@ def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
             request = self._record()
             if stub.delay:
                 time.sleep(stub.delay)
+            if self.path == "/v1/videos":
+                self._create_video()
+                return
             if self.path != "/v1/images/generations":
                 self._send(404, b"{}", "application/json", {})
                 return
@@ -145,6 +225,14 @@ def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
                 },
             }
             self._send(200, json.dumps(answer).encode(), "application/json", job)
+
+        def _create_video(self) -> None:
+            job = {"x-liquid-job-id": VIDEO_JOB}
+            if stub.mode == "error":
+                self._send(stub.status, json.dumps(stub.error).encode(), "application/json", job)
+                return
+            body = json.dumps(video_status("in_progress")).encode()
+            self._send(200, body, "application/json", job)
 
     return Handler
 

@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass
 from http.client import HTTPException, HTTPResponse
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from . import __version__
 
@@ -22,6 +22,10 @@ USER_AGENT = f"liquid-comfyui/{__version__}"
 # An image job can wait in a queue at the seller before it starts.
 GENERATION_TIMEOUT = 300.0
 MAX_IMAGE_BYTES = 64 * 1024 * 1024
+MAX_VIDEO_BYTES = 512 * 1024 * 1024
+# One status read or one download, not the whole wait for a video job.
+READ_TIMEOUT = 30.0
+DOWNLOAD_TIMEOUT = 300.0
 JOB_HEADER = "x-liquid-job-id"
 # Codes that say that no seller can serve the selected model now. The model
 # list of the node is from when the page loaded, so it can be old.
@@ -31,6 +35,20 @@ _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
 class LiquidError(RuntimeError):
     """A request to Liquid Inference failed. The message is for the user."""
+
+
+class RetryableError(LiquidError):
+    """A read failed in a way that the next try can fix.
+
+    Only a read is tried again. A purchase is never sent twice.
+    """
+
+
+# The codes of a read that can succeed later: the file is not at the router
+# yet, or the seller or the store did not answer.
+RETRYABLE_CODES = frozenset(
+    {"video_not_ready", "provider_unavailable", "provider_failed", "storage_unavailable"}
+)
 
 
 @dataclass(frozen=True)
@@ -69,6 +87,22 @@ class Client:
         self.api_key = api_key
         self.timeout = timeout
 
+    def list_video_models(self, timeout: float) -> list[dict[str, Any]]:
+        """Returns the entries of `GET /exchange/models?kind=video`.
+
+        The route needs no key, and it refuses a key that it does not know.
+        Thus the request has no key, and a bad key cannot hide the list.
+        """
+        request = urllib.request.Request(
+            f"{self.base_url}/exchange/models?kind=video",
+            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+        )
+        with _router.open(request, timeout=timeout) as response:
+            body = json.load(response)
+        if not isinstance(body, list):
+            raise LiquidError("the video model list is not a JSON array")
+        return [entry for entry in body if isinstance(entry, dict)]
+
     def list_models(self, timeout: float) -> list[dict[str, Any]]:
         """Returns the model cards from `GET /models`.
 
@@ -92,24 +126,100 @@ class Client:
         and not the images, so a retry cannot recover them. A retry with a new
         key can buy the images a second time.
         """
-        if not self.api_key:
-            raise LiquidError(
-                "No Liquid Inference API key. Set it in Settings > Liquid Inference, "
-                "or set the LIQUID_API_KEY environment variable before you start ComfyUI."
-            )
-        idempotency_key = str(uuid.uuid4())
         # No `response_format`: a seller whose upstream does not take that
         # field refuses a request that sets it. The node reads `b64_json` and
         # `url`, so it accepts the form that the seller returns.
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "n": n}
         if size is not None:
             payload["size"] = size
+        body, job_header = self._buy("/images/generations", payload, cap_usd)
+        exchange = body.get("exchange") if isinstance(body, dict) else None
+        exchange = exchange if isinstance(exchange, dict) else {}
+        job_id = str(exchange.get("job_id") or job_header or "")
+        items = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(items, list) or not items:
+            raise LiquidError(
+                f"The router returned no images for job {job_id or 'unknown'}. "
+                "Look at the job's receipt before you run the node again."
+            )
+        images = [_image_bytes(item, job_id) for item in items]
+        return Generation(images=images, job_id=job_id, exchange=exchange)
+
+    def create_video(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        size: str | None,
+        seconds: int | None,
+        start_image: str | None,
+        cap_usd: float,
+        retention_policy: str = "none",
+    ) -> str:
+        """Buys one video job and returns its ID. It never sends the request again.
+
+        `start_image` is a `data:` URL. The job runs at the seller after this
+        returns, and the exchange charges for it when it ends.
+        """
+        if retention_policy not in {"none", "allowed"}:
+            raise LiquidError("retention_policy must be none or allowed.")
+        payload: dict[str, Any] = {
+            "model": model,
+            "prompt": prompt,
+            "exchange": {"retention_policy": retention_policy},
+        }
+        if size is not None:
+            payload["size"] = size
+        if seconds is not None:
+            payload["seconds"] = str(seconds)
+        if start_image is not None:
+            payload["input_reference"] = {"image_url": start_image}
+        body, job_header = self._buy("/videos", payload, cap_usd)
+        job_id = body.get("id") if isinstance(body, dict) else None
+        job_id = str(job_id or job_header or "")
+        if not job_id:
+            raise LiquidError(
+                "The router accepted the video job but returned no job ID. "
+                "Look at your receipts before you run the node again."
+            )
+        return job_id
+
+    def video_status(self, job_id: str) -> dict[str, Any]:
+        """Reads `GET /videos/{id}`. A failure that can pass raises `RetryableError`."""
+        raw = self._get(f"/videos/{quote(job_id, safe='')}", job_id, 1024 * 1024, READ_TIMEOUT)
+        try:
+            body = json.loads(raw)
+        except ValueError:
+            raise RetryableError(f"the status of job {job_id} is not JSON") from None
+        if not isinstance(body, dict):
+            raise RetryableError(f"the status of job {job_id} is not a JSON object")
+        return body
+
+    def video_content(self, job_id: str) -> bytes:
+        """Gets the file of a finished job through the router, with the key."""
+        path = f"/videos/{quote(job_id, safe='')}/content"
+        data = self._get(path, job_id, MAX_VIDEO_BYTES, DOWNLOAD_TIMEOUT)
+        if len(data) > MAX_VIDEO_BYTES:
+            raise LiquidError(f"Job {job_id}: the video is larger than 512 MiB.")
+        return data
+
+    def _require_key(self) -> None:
+        if not self.api_key:
+            raise LiquidError(
+                "No Liquid Inference API key. Set it in Settings > Liquid Inference, "
+                "or set the LIQUID_API_KEY environment variable before you start ComfyUI."
+            )
+
+    def _buy(self, path: str, payload: dict[str, Any], cap_usd: float) -> tuple[Any, str | None]:
+        """Sends one paid request and returns its JSON body and its job ID header."""
+        self._require_key()
+        idempotency_key = str(uuid.uuid4())
         headers = self._headers()
         headers["Content-Type"] = "application/json"
         headers["x-liquid-cap-usd"] = format_usd(cap_usd)
         headers["Idempotency-Key"] = idempotency_key
         request = urllib.request.Request(
-            f"{self.base_url}/images/generations",
+            f"{self.base_url}{path}",
             data=json.dumps(payload).encode(),
             headers=headers,
             method="POST",
@@ -133,23 +243,30 @@ class Client:
             raise _unknown(idempotency_key, error) from None
 
         try:
-            body = json.loads(raw)
+            return json.loads(raw), job_header
         except ValueError:
             raise LiquidError(
                 f"The router answered HTTP {status} with a body that is not JSON. "
                 f"Job ID: {job_header or 'unknown'}. Idempotency-Key: {idempotency_key}."
             ) from None
-        exchange = body.get("exchange") if isinstance(body, dict) else None
-        exchange = exchange if isinstance(exchange, dict) else {}
-        job_id = str(exchange.get("job_id") or job_header or "")
-        items = body.get("data") if isinstance(body, dict) else None
-        if not isinstance(items, list) or not items:
-            raise LiquidError(
-                f"The router returned no images for job {job_id or 'unknown'}. "
-                "Look at the job's receipt before you run the node again."
-            )
-        images = [_image_bytes(item, job_id) for item in items]
-        return Generation(images=images, job_id=job_id, exchange=exchange)
+
+    def _get(self, path: str, job_id: str, limit: int, timeout: float) -> bytes:
+        """A read with the key. It reads at most `limit` + 1 bytes."""
+        self._require_key()
+        request = urllib.request.Request(f"{self.base_url}{path}", headers=self._headers())
+        try:
+            with _router.open(request, timeout=timeout) as response:
+                data: bytes = response.read(limit + 1)
+                return data
+        except urllib.error.HTTPError as error:
+            body = error.read()
+            message = refusal_message(error.code, body, job_id)
+            if error.code >= 500 or error.code == 429 or _code(body) in RETRYABLE_CODES:
+                raise RetryableError(message) from None
+            raise LiquidError(message) from None
+        except (urllib.error.URLError, TimeoutError, OSError, HTTPException) as error:
+            reason = error.reason if isinstance(error, urllib.error.URLError) else error
+            raise RetryableError(f"the request to {self.base_url} failed: {reason}") from None
 
     def _headers(self) -> dict[str, str]:
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
@@ -256,6 +373,14 @@ def refusal_message(
     return message
 
 
+def _code(body: bytes) -> str | None:
+    try:
+        code = json.loads(body)["error"]["code"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return code if isinstance(code, str) else None
+
+
 def _describe(body: bytes) -> str:
     """Names a body that is not JSON in a few words, not as a page of HTML."""
     text = body.decode("utf-8", "replace").strip()
@@ -287,6 +412,31 @@ def _exclusions(eligibility: object, limit: int = 8) -> str:
     if len(rows) > limit:
         parts.append(f"{len(rows) - limit} more")
     return "; ".join(parts)
+
+
+def video_receipt(status: dict[str, Any]) -> str:
+    """A short JSON summary of a finished video job, for a text output."""
+    exchange = status.get("exchange")
+    exchange = exchange if isinstance(exchange, dict) else {}
+    addressing = exchange.get("addressing")
+    served = addressing.get("served_model") if isinstance(addressing, dict) else None
+    charge = exchange.get("charge")
+    charge = charge if isinstance(charge, dict) else {}
+    return json.dumps(
+        {
+            "job_id": status.get("id"),
+            "model": served or status.get("model"),
+            "provider": exchange.get("provider_slug"),
+            "charge_usd": charge.get("total_usd"),
+            "cap_usd": charge.get("cap_usd"),
+            "seconds": status.get("seconds"),
+            "size": status.get("size"),
+            "settlement_status": exchange.get("status"),
+            "expires_at": status.get("expires_at"),
+            "node_version": __version__,
+        },
+        separators=(",", ":"),
+    )
 
 
 def receipt(generation: Generation, model: str, cap_usd: float) -> str:

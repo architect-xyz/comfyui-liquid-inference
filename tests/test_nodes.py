@@ -10,7 +10,7 @@ from stub_router import Stub, dead_base
 
 from liquid_inference import __version__, nodes
 from liquid_inference.client import Client
-from liquid_inference.models import Catalog
+from liquid_inference.models import IMAGES, Catalog
 
 KEY = "lq_node_key_7"
 
@@ -20,7 +20,7 @@ def node(router: Stub, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> nodes
     # torch is large, and the node only calls `torch.from_numpy`.
     monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(from_numpy=lambda a: a))
     client = Client(f"{router.base}/v1", KEY)
-    catalog = Catalog(lambda: client, tmp_path / "models.json")
+    catalog = Catalog(lambda: client, tmp_path / "models.json", IMAGES)
     monkeypatch.setattr(nodes, "_client", lambda: client)
     monkeypatch.setattr(nodes, "_catalog", lambda: catalog)
     return nodes.LiquidImage()
@@ -53,7 +53,9 @@ def test_with_no_list_the_model_input_shows_a_placeholder(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client = Client(dead_base(), KEY)
-    monkeypatch.setattr(nodes, "_catalog", lambda: Catalog(lambda: client, tmp_path / "m.json"))
+    monkeypatch.setattr(
+        nodes, "_catalog", lambda: Catalog(lambda: client, tmp_path / "m.json", IMAGES)
+    )
     assert widgets()["model"][0] == [nodes.NO_MODELS]
     assert nodes.LiquidImage.VALIDATE_INPUTS(nodes.NO_MODELS, "auto") is not True
 
