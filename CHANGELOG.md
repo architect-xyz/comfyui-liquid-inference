@@ -2,6 +2,12 @@
 
 Each release of the Liquid Inference node for ComfyUI, newest first.
 
+## 0.2.0 -- 2026-10-26
+
+### Added
+
+- add the Liquid Video node
+
 ## 0.1.1 -- 2026-10-14
 
 ### Added
