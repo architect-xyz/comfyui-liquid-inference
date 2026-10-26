@@ -31,6 +31,17 @@ the images or the video that you get.
 To install by hand, clone this repository into `ComfyUI/custom_nodes/`, then
 restart ComfyUI. The package has no Python dependencies to install.
 
+## Sign in
+
+For ComfyUI on this machine, open **Settings > Liquid Inference**, then select **Sign in**.
+Approve spend access in the new page. Select a spend limit that covers your planned runs.
+The key expires after seven days. When it expires, select **Sign in** again.
+Sign-in uses the default Liquid router and an HTTP loopback address.
+
+For a remote ComfyUI server, create a key at <https://inference.ai.exchange/keys>.
+Paste that key with the steps below.
+Add funds at <https://inference.ai.exchange/credits> if your balance is too low.
+
 ## Set the API key
 
 1. Open **Settings**, then **Liquid Inference**.

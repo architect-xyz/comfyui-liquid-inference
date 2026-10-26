@@ -81,11 +81,17 @@ _downloads = urllib.request.build_opener()
 
 class Client:
     def __init__(
-        self, base_url: str, api_key: str | None, *, timeout: float = GENERATION_TIMEOUT
+        self,
+        base_url: str,
+        api_key: str | None,
+        *,
+        timeout: float = GENERATION_TIMEOUT,
+        key_expired: bool = False,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+        self.key_expired = key_expired
 
     def list_image_models(self, timeout: float) -> list[dict[str, Any]]:
         return self._directory("image", timeout)
@@ -210,10 +216,16 @@ class Client:
         return data
 
     def _require_key(self) -> None:
+        if self.key_expired:
+            raise LiquidError(
+                "Your Liquid sign-in expired. Select Sign in again in Settings > Liquid Inference."
+            )
         if not self.api_key:
             raise LiquidError(
-                "No Liquid Inference API key. Set it in Settings > Liquid Inference, "
-                "or set the LIQUID_API_KEY environment variable before you start ComfyUI."
+                "No Liquid Inference API key. Select Sign in in Settings > Liquid Inference. "
+                "For a remote server, create a key at https://inference.ai.exchange/keys. "
+                "Paste it in Settings > Liquid Inference. "
+                "You can also set LIQUID_API_KEY before you start ComfyUI."
             )
 
     def _buy(self, path: str, payload: dict[str, Any], cap_usd: float) -> tuple[Any, str | None]:
@@ -372,6 +384,15 @@ def refusal_message(
         reasons = _exclusions(error.get("eligibility"))
         if reasons:
             message += f". Offers excluded: {reasons}"
+        if status == 401:
+            message += (
+                ". Select Sign in again in Settings > Liquid Inference. "
+                "Or replace the saved API key at https://inference.ai.exchange/keys"
+            )
+        if code == "insufficient_balance":
+            message += (
+                ". Add funds at https://inference.ai.exchange/credits, then run the node again"
+            )
         if code in MODEL_LIST_CODES:
             message += ". Reload the page to get the current model list"
     if job_id:

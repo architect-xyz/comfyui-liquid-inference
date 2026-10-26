@@ -24,6 +24,7 @@ async function post(path, body) {
 }
 
 function keyText(status) {
+  if (status.key_expired) return "Key expired. Select Sign in again";
   if (status.key_source === "environment") return "Set by LIQUID_API_KEY";
   return status.key_set ? "A key is saved" : "No key";
 }
@@ -44,7 +45,7 @@ function button(label, onClick) {
 
 // Makes a field with Save and Clear buttons. `save` gets the text and
 // returns the new status.
-function field({ type, placeholder, describe, save, initial }) {
+function field({ type, placeholder, describe, save, initial, signIn = false }) {
   const root = document.createElement("div");
   root.style.display = "flex";
   root.style.alignItems = "center";
@@ -75,6 +76,37 @@ function field({ type, placeholder, describe, save, initial }) {
     button("Clear", () => run("")),
     note,
   );
+  if (signIn) {
+    const signInButton = button("Sign in", async () => {
+      const popup = window.open("about:blank", "_blank");
+      if (!popup) {
+        note.textContent = "Allow popups for ComfyUI, then select Sign in again.";
+        return;
+      }
+      popup.opener = null;
+      signInButton.disabled = true;
+      try {
+        const { url } = await post("/liquid-inference/sign-in", {});
+        popup.location.replace(url);
+        note.textContent = "Complete sign-in in the new page.";
+        const deadline = Date.now() + 10 * 60 * 1000;
+        while (Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          const status = await getStatus();
+          if (status.sign_in === "complete") { show(status); return; }
+          if (status.sign_in === "failed") throw new Error(status.sign_in_error);
+          if (popup.closed) throw new Error("Sign-in page closed. Select Sign in again if no key was saved.");
+        }
+        throw new Error("Sign-in expired. Select Sign in again.");
+      } catch (error) {
+        popup.close();
+        note.textContent = String(error.message ?? error);
+      } finally {
+        signInButton.disabled = false;
+      }
+    });
+    root.append(signInButton);
+  }
   getStatus().then(show, () => (note.textContent = "Status unknown"));
   return root;
 }
@@ -92,6 +124,7 @@ app.registerExtension({
       type: () =>
         field({
           type: "password",
+          signIn: true,
           placeholder: "Paste a key, then Save",
           describe: keyText,
           save: (value) => post("/liquid-inference/key", { api_key: value }),

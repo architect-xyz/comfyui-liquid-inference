@@ -79,3 +79,15 @@ def test_the_base_url_route_refuses_a_bad_url(tmp_path: Path) -> None:
     code, payload = store_base_url(config, "application/json", b'{"base_url": "ftp://x"}')
     assert code == 400
     assert "https://" in str(payload["error"])
+
+
+def test_an_oauth_expiry_belongs_only_to_its_saved_key(tmp_path: Path) -> None:
+    config = Config(tmp_path, {})
+    config.set_api_key(KEY, expires_at=100)
+    assert config.key_expired(now=101)
+    assert not config.key_expired(now=99)
+    config.environ = {"LIQUID_API_KEY": KEY}
+    assert not config.key_expired(now=101)
+    config.environ = {}
+    config.set_api_key("manual-key")
+    assert not config.key_expired(now=101)

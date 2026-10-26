@@ -261,3 +261,25 @@ def test_a_provider_failure_names_the_code_and_not_the_reload(router: Stub) -> N
         "Liquid Inference refused the request (HTTP 503, provider_failed): "
         "acme could not run this request; you were not charged. Job ID: job-stub-1"
     )
+
+
+def test_expired_sign_in_never_sends_a_purchase(router: Stub) -> None:
+    client = Client(f"{router.base}/v1", "saved-key", key_expired=True)
+    with pytest.raises(LiquidError, match="Sign in again"):
+        client.generate(model="image", prompt="fox", n=1, size=None, cap_usd=0.1)
+    assert not router.calls("/v1/images/generations")
+
+
+def test_account_refusals_give_the_next_step() -> None:
+    from liquid_inference.client import refusal_message
+
+    low_balance = json.dumps(
+        {"error": {"code": "insufficient_balance", "message": "need $0.20, balance $0.02"}}
+    ).encode()
+    message = refusal_message(402, low_balance, "job")
+    assert all(
+        text in message
+        for text in ["$0.20", "$0.02", "https://inference.ai.exchange/credits", "job"]
+    )
+    expired = refusal_message(401, b'{"error":{"code":"invalid_api_key"}}', None)
+    assert "Sign in again" in expired

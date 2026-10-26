@@ -7,8 +7,11 @@ would go to each person who receives the file.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import tempfile
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
@@ -54,15 +57,39 @@ class Config:
         key = _read(self.key_file)
         return Setting(key, "settings") if key else None
 
-    def set_api_key(self, key: str) -> None:
+    def set_api_key(self, key: str, *, expires_at: float | None = None) -> None:
         """Stores the key, or deletes the stored key when `key` is empty."""
         key = key.strip()
         if not key:
             self.key_file.unlink(missing_ok=True)
+            (self.directory / "key_expiry.json").unlink(missing_ok=True)
             return
         if len(key) > MAX_KEY_LENGTH or any(c.isspace() or not c.isprintable() for c in key):
             raise ValueError("the API key has characters that a key cannot have")
         self._write(self.key_file, key)
+        expiry_file = self.directory / "key_expiry.json"
+        if expires_at is None:
+            expiry_file.unlink(missing_ok=True)
+        else:
+            self._write(
+                expiry_file,
+                json.dumps(
+                    {"key_hash": hashlib.sha256(key.encode()).hexdigest(), "expires_at": expires_at}
+                ),
+            )
+
+    def key_expired(self, *, now: float | None = None) -> bool:
+        key = self.api_key()
+        if key is None or key.source == "environment":
+            return False
+        try:
+            expiry = json.loads((self.directory / "key_expiry.json").read_text())
+            return bool(
+                expiry["key_hash"] == hashlib.sha256(key.value.encode()).hexdigest()
+                and (time.time() if now is None else now) >= expiry["expires_at"]
+            )
+        except (FileNotFoundError, ValueError, KeyError, TypeError):
+            return False
 
     def base_url(self) -> Setting:
         url = self.environ.get(BASE_URL_ENV, "").strip()
@@ -87,6 +114,7 @@ class Config:
         base_url = self.base_url()
         return {
             "key_set": key is not None,
+            "key_expired": self.key_expired(),
             "key_source": key.source if key else None,
             "base_url": base_url.value,
             "base_url_source": base_url.source,

@@ -32,7 +32,9 @@ JOB_ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
 def _client() -> Client:
     config = comfy_config()
     key = config.api_key()
-    return Client(config.base_url().value, key.value if key else None)
+    return Client(
+        config.base_url().value, key.value if key else None, key_expired=config.key_expired()
+    )
 
 
 @cache
