@@ -1,6 +1,6 @@
 [project]
 classifiers = ["Operating System :: OS Independent"]
-description = "Generate images and videos in ComfyUI with Liquid Inference, an auction exchange for inference. Each run is a paid request with a price cap."
+description = "Nano Banana, Seedream, Seedance, Kling, Veo and FLUX in ComfyUI through Liquid Inference, with a USD cap on each run."
 license = { file = "LICENSE" }
 name = "liquid-inference"
 readme = "README.md"
