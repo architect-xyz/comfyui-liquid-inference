@@ -2,6 +2,21 @@
 
 Each release of the Liquid Inference node for ComfyUI, newest first.
 
+## 0.3.0 -- 2026-10-26
+
+### Added
+
+- add local account sign-in
+- show prices and image charges
+
+### Fixed
+
+- make example templates runnable
+
+### Changed
+
+- name models in Registry text
+
 ## 0.2.0 -- 2026-10-26
 
 ### Added
