@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -32,6 +33,7 @@ MAX_AGE = 60.0
 class ImageModel:
     id: str
     sizes: tuple[str, ...]
+    rate_per_image_usd: float | None = None
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class VideoModel:
     seconds: tuple[int, ...]
     # True when an offer for the model reads an image input.
     start_image: bool
+    rate_per_video_second_usd: float | None = None
 
 
 M = TypeVar("M", ImageModel, VideoModel)
@@ -56,7 +59,7 @@ class Router(Protocol):
     @property
     def base_url(self) -> str: ...
 
-    def list_models(self, timeout: float) -> list[dict[str, Any]]: ...
+    def list_image_models(self, timeout: float) -> list[dict[str, Any]]: ...
 
     def list_video_models(self, timeout: float) -> list[dict[str, Any]]: ...
 
@@ -69,12 +72,19 @@ class _Sized(Protocol):
 def image_models(cards: list[dict[str, Any]]) -> list[ImageModel]:
     models = []
     for card in cards:
-        model_id = card.get("id")
+        model_id = card.get("model", card.get("id"))
         if card.get("kind") != IMAGE_KIND or not isinstance(model_id, str):
             continue
-        sizes = card.get("image_sizes")
+        output = _modality(card.get("output_modalities"), "image") or {}
+        sizes = card.get("image_sizes", output.get("sizes"))
         sizes = sizes if isinstance(sizes, list) else []
-        models.append(ImageModel(model_id, tuple(s for s in sizes if isinstance(s, str))))
+        models.append(
+            ImageModel(
+                model_id,
+                tuple(s for s in sizes if isinstance(s, str)),
+                _rate(card, "rate_per_image_usd"),
+            )
+        )
     return models
 
 
@@ -98,9 +108,20 @@ def video_models(entries: list[dict[str, Any]]) -> list[VideoModel]:
                 # bool is a subclass of int, and JSON `true` is not a length.
                 tuple(s for s in seconds if type(s) is int) if isinstance(seconds, list) else (),
                 _modality(entry.get("input_modalities"), "image") is not None,
+                _rate(entry, "rate_per_video_second_usd"),
             )
         )
     return models
+
+
+def _rate(entry: dict[str, Any], field: str) -> float | None:
+    rate = entry.get(field)
+    value = rate.get("min") if isinstance(rate, dict) else None
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    if not math.isfinite(value) or value <= 0:
+        return None
+    return float(value)
 
 
 def _modality(modalities: object, kind: str) -> dict[str, Any] | None:
@@ -147,7 +168,7 @@ class Kind(Generic[M]):
     fetch: Callable[[Router, float], list[M]]
 
 
-IMAGES = Kind(ImageModel, lambda router, timeout: image_models(router.list_models(timeout)))
+IMAGES = Kind(ImageModel, lambda router, timeout: image_models(router.list_image_models(timeout)))
 VIDEOS = Kind(VideoModel, lambda router, timeout: video_models(router.list_video_models(timeout)))
 
 

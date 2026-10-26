@@ -124,6 +124,7 @@ class Stub:
     error: dict[str, Any] = field(default_factory=dict)
     delay: float = 0.0
     image: bytes = field(default_factory=png)
+    image_entries: list[dict[str, Any]] = field(default_factory=lambda: list(IMAGE_CARDS))
     video_entries: list[dict[str, Any]] = field(default_factory=lambda: list(VIDEO_ENTRIES))
     # Each read of the job takes the next answer. The last answer repeats.
     statuses: list[tuple[int, bytes]] = field(
@@ -172,6 +173,8 @@ def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
             if self.path == "/v1/models":
                 body = json.dumps({"object": "list", "data": stub.cards}).encode()
                 self._send(200, body, "application/json", {})
+            elif self.path == "/v1/exchange/models?kind=image":
+                self._send(200, json.dumps(stub.image_entries).encode(), "application/json", {})
             elif self.path == "/files/image.png":
                 self._send(200, stub.image, "image/png", {})
             elif self.path == "/v1/exchange/models?kind=video":

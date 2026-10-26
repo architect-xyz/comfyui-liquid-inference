@@ -57,6 +57,19 @@ def register(config: Callable[[], Config]) -> None:
         code, payload = result
         return web.json_response(payload, status=code)
 
+    async def get_prices(request: Any) -> Any:
+        import asyncio
+        from dataclasses import asdict
+
+        from .nodes import _catalog, _video_catalog
+
+        images, videos = await asyncio.gather(
+            asyncio.to_thread(_catalog().models), asyncio.to_thread(_video_catalog().models)
+        )
+        return web.json_response(
+            {"images": [asdict(m) for m in images], "videos": [asdict(m) for m in videos]}
+        )
+
     async def get_status(request: Any) -> Any:
         return answer(status(config()))
 
@@ -66,6 +79,7 @@ def register(config: Callable[[], Config]) -> None:
     async def post_base_url(request: Any) -> Any:
         return answer(store_base_url(config(), request.content_type, await request.read()))
 
+    routes.get("/liquid-inference/prices")(get_prices)
     routes.get("/liquid-inference/status")(get_status)
     routes.post("/liquid-inference/key")(post_key)
     routes.post("/liquid-inference/base-url")(post_base_url)

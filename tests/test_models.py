@@ -29,6 +29,7 @@ class Down:
         raise OSError("down")
 
     list_video_models = list_models
+    list_image_models = list_models
 
 
 def catalog(base: str, cache: Path, clock: list[float] | None = None) -> Catalog[ImageModel]:
@@ -74,13 +75,13 @@ def test_the_cache_of_another_router_is_not_shown(router: Stub, tmp_path: Path) 
     assert len(catalog(f"{router.base}/v1", cache).models()) == 3
 
     assert catalog(dead_base(), cache).models() == []
-    with serve(Stub(cards=router.cards[:1])) as other:
+    with serve(Stub(cards=router.cards[:1], image_entries=router.cards[:1])) as other:
         models = catalog(f"{other.base}/v1", cache).models()
     assert [m.id for m in models] == ["blackforestlabs/flux-schnell"]
 
 
 def test_a_new_base_url_gets_its_list_at_once(router: Stub, tmp_path: Path) -> None:
-    with serve(Stub(cards=router.cards[:1])) as other:
+    with serve(Stub(cards=router.cards[:1], image_entries=router.cards[:1])) as other:
         clients = [Client(f"{router.base}/v1", None)]
         models = Catalog(lambda: clients[0], tmp_path / "m.json", IMAGES, clock=lambda: 0.0)
         assert len(models.models()) == 3
@@ -105,12 +106,13 @@ def test_a_stale_list_refreshes_in_the_background(router: Stub, tmp_path: Path) 
     models = catalog(f"{router.base}/v1", tmp_path / "m.json", now)
     assert len(models.models()) == 3
     router.cards = router.cards[:1]
+    router.image_entries = router.image_entries[:1]
     assert len(models.models()) == 3
     now[0] = 61.0
     assert len(models.models()) == 3
     models.wait()
     assert [m.id for m in models.models()] == ["blackforestlabs/flux-schnell"]
-    assert len(router.calls("/v1/models")) == 2
+    assert len(router.calls("/v1/exchange/models?kind=image")) == 2
 
 
 def test_video_models_list_their_sizes_lengths_and_start_image(router: Stub) -> None:
@@ -137,3 +139,29 @@ def test_the_video_cache_answers_when_the_router_is_down(router: Stub, tmp_path:
 
     down = Down(f"{router.base}/v1")
     assert Catalog(lambda: down, cache, VIDEOS).models() == first
+
+
+def test_directory_prices_share_the_catalog_cache(router: Stub, tmp_path: Path) -> None:
+    router.image_entries = [
+        {
+            "model": "priced/image",
+            "kind": "image_generation",
+            "rate_per_image_usd": {"min": 0.04},
+            "output_modalities": [{"type": "image", "sizes": ["1536x1536"]}],
+        }
+    ]
+    models = catalog(f"{router.base}/v1", tmp_path / "prices.json")
+    first = models.models()
+    assert first[0].id == "priced/image"
+    assert first[0].rate_per_image_usd == 0.04
+    assert first[0].sizes == ("1536x1536",)
+    assert models.models() == first
+    assert len(router.calls("/v1/exchange/models?kind=image")) == 1
+
+
+def test_invalid_prices_are_unknown() -> None:
+    for rate in [None, {}, {"min": True}, {"min": -1}, {"min": float("inf")}]:
+        model = image_models(
+            [{"id": "image", "kind": "image_generation", "rate_per_image_usd": rate}]
+        )[0]
+        assert model.rate_per_image_usd is None

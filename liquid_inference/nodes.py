@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 
 from . import videos
-from .client import Client, LiquidError, receipt, video_receipt
+from .client import Client, LiquidError, format_usd, receipt, video_receipt
 from .config import comfy_config
 from .images import decode_batch
 from .models import IMAGES, VIDEOS, Catalog, ImageModel, VideoModel, seconds_choices, size_choices
@@ -136,7 +136,8 @@ class LiquidImage:
                         "runs. The cap applies to each request, not to the whole workflow.",
                     },
                 ),
-            }
+            },
+            "hidden": {"unique_id": "UNIQUE_ID"},
         }
 
     @classmethod
@@ -150,7 +151,13 @@ class LiquidImage:
         return True
 
     def generate(
-        self, prompt: str, model: str, size: str, n: int, cap_usd: float
+        self,
+        prompt: str,
+        model: str,
+        size: str,
+        n: int,
+        cap_usd: float,
+        unique_id: str | None = None,
     ) -> tuple[Any, str, str]:
         import torch
 
@@ -167,6 +174,13 @@ class LiquidImage:
             batch = decode_batch(generation.images)
         except ValueError as error:
             raise LiquidError(f"Job {generation.job_id} was charged, but {error}.") from None
+        exchange = generation.exchange
+        seller = exchange.get("provider_slug") or exchange.get("provider_id") or "unknown seller"
+        charge = exchange.get("buyer_charge_usd")
+        charged = f"${charge}" if charge is not None else "unknown charge"
+        _reporter(unique_id)(
+            f"{seller} · charged {charged} · cap ${format_usd(cap_usd)} · job {generation.job_id}"
+        )
         return (
             torch.from_numpy(batch),
             generation.job_id,

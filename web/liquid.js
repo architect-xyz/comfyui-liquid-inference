@@ -5,6 +5,7 @@
 // renderer, so the key is not written to comfy.settings.json.
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { priceBadge } from "./prices.js";
 
 async function getStatus() {
   const response = await api.fetchApi("/liquid-inference/status");
@@ -113,4 +114,55 @@ app.registerExtension({
         }),
     },
   ],
+});
+
+let priceDirectory = null;
+let priceRequest = null;
+let priceReadAt = 0;
+
+function refreshPrices() {
+  if (priceRequest || Date.now() - priceReadAt < 60000) return;
+  priceReadAt = Date.now();
+  priceRequest = api.fetchApi("/liquid-inference/prices")
+    .then((response) => {
+      if (!response.ok) throw new Error("Price unavailable");
+      return response.json();
+    })
+    .then((directory) => {
+      priceDirectory = directory;
+      app.graph?.setDirtyCanvas(true, true);
+    })
+    .catch(() => { priceDirectory = null; })
+    .finally(() => { priceRequest = null; });
+}
+
+app.registerExtension({
+  name: "LiquidInference.Prices",
+  nodeCreated(node) {
+    if (!["LiquidImage", "LiquidVideo"].includes(node.comfyClass)) return;
+    node.addCustomWidget({
+      name: "liquid_price",
+      type: "liquid_price",
+      options: { serialize: false },
+      computeSize: (width) => [width, 26],
+      draw(ctx, currentNode, width, y) {
+        refreshPrices();
+        const values = Object.fromEntries((currentNode.widgets ?? []).map((widget) => [widget.name, widget.value]));
+        for (const input of currentNode.inputs ?? []) {
+          if (input.link != null) values[input.name] = null;
+        }
+        const badge = priceBadge(priceDirectory, currentNode.comfyClass, values);
+        ctx.save();
+        ctx.fillStyle = badge.low ? "#ef7777" : "#c9d9c9";
+        ctx.font = "12px sans-serif";
+        ctx.fillText(badge.text, 10, y + 17, width - 20);
+        ctx.restore();
+      },
+    });
+    node.setSize(node.computeSize());
+    refreshPrices();
+  },
+  setup() {
+    setInterval(refreshPrices, 60000);
+  },
 });

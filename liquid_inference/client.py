@@ -87,14 +87,20 @@ class Client:
         self.api_key = api_key
         self.timeout = timeout
 
+    def list_image_models(self, timeout: float) -> list[dict[str, Any]]:
+        return self._directory("image", timeout)
+
     def list_video_models(self, timeout: float) -> list[dict[str, Any]]:
+        return self._directory("video", timeout)
+
+    def _directory(self, kind: str, timeout: float) -> list[dict[str, Any]]:
         """Returns the entries of `GET /exchange/models?kind=video`.
 
         The route needs no key, and it refuses a key that it does not know.
         Thus the request has no key, and a bad key cannot hide the list.
         """
         request = urllib.request.Request(
-            f"{self.base_url}/exchange/models?kind=video",
+            f"{self.base_url}/exchange/models?kind={kind}",
             headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
         )
         with _router.open(request, timeout=timeout) as response:

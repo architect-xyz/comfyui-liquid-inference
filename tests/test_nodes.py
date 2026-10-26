@@ -33,7 +33,7 @@ def widgets() -> dict[str, Any]:
 
 def test_no_input_can_hold_a_key(node: nodes.LiquidImage) -> None:
     names = set(widgets())
-    assert names == {"prompt", "model", "size", "n", "cap_usd"}
+    assert names == {"prompt", "model", "size", "n", "cap_usd", "unique_id"}
     for name in names:
         assert not re.search("key|token|secret|auth|password", name, re.IGNORECASE)
 
@@ -92,3 +92,13 @@ def test_the_version_matches_the_project() -> None:
     match = re.search(r'^version = "([^"]+)"', project, re.MULTILINE)
     assert match is not None
     assert match.group(1) == __version__
+
+
+def test_image_status_shows_the_seller_charge_cap_and_job(
+    node: nodes.LiquidImage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reports: list[str] = []
+    monkeypatch.setattr(nodes, "_reporter", lambda node_id: reports.append)
+    node.generate("a cat", "openai/gpt-image", "auto", 1, 0.05, unique_id="7")
+    assert len(reports) == 1
+    assert all(value in reports[0] for value in ["stub-seller", "$0.04", "$0.05", "job-stub-1"])
