@@ -251,7 +251,7 @@ def test_an_example_workflow_saves_images_without_the_key(
     assert len(posts) == liquid_nodes
     for request in posts:
         assert request.headers["authorization"] == f"Bearer {SENTINEL}"
-        assert request.headers["x-liquid-cap-usd"] == "0.05"
+        assert request.headers["x-liquid-cap-usd"] == "0.1"
         assert "size" not in request.json()
 
     written = set(output.rglob("*.png")) - before

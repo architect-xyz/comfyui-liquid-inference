@@ -43,10 +43,10 @@
       },
       "widgets_values": [
         "A red fox in fresh snow at sunrise, soft light, photograph",
-        "blackforestlabs/flux-schnell",
+        "bytedance/seedream-4.5",
         "auto",
         1,
-        0.05
+        0.1
       ]
     },
     {
