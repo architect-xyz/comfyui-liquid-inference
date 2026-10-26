@@ -100,7 +100,7 @@ class Client:
         return self._directory("video", timeout)
 
     def _directory(self, kind: str, timeout: float) -> list[dict[str, Any]]:
-        """Returns the entries of `GET /exchange/models?kind=video`.
+        """Returns the entries of `GET /exchange/models?kind=<kind>`.
 
         The route needs no key, and it refuses a key that it does not know.
         Thus the request has no key, and a bad key cannot hide the list.
@@ -112,7 +112,7 @@ class Client:
         with _router.open(request, timeout=timeout) as response:
             body = json.load(response)
         if not isinstance(body, list):
-            raise LiquidError("the video model list is not a JSON array")
+            raise LiquidError(f"the {kind} model list is not a JSON array")
         return [entry for entry in body if isinstance(entry, dict)]
 
     def list_models(self, timeout: float) -> list[dict[str, Any]]:
