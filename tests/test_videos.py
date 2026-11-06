@@ -217,3 +217,15 @@ def test_the_inputs_list_the_video_models_and_no_input_can_hold_a_key(
     assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", "31") is not True
     assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", "30") is True
     assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "1080x1920", "12") is True
+
+
+def test_the_node_takes_the_length_limit_of_the_exchange() -> None:
+    # The Rust constant is the one source. A raise of it must reach the node.
+    source = (
+        Path(__file__).parents[3] / "rs/sdk-internal/modality/src/output/video.rs"
+    ).read_text()
+    match = re.search(r"pub const MAX_SECONDS: u32 = (\d+);", source)
+    assert match is not None
+    limit = int(match.group(1))
+    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", str(limit)) is True
+    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", str(limit + 1)) is not True
