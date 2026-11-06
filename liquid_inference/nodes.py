@@ -24,8 +24,8 @@ log = logging.getLogger(__name__)
 NO_MODELS = "(no image models: check the connection, then reload)"
 NO_VIDEO_MODELS = "(no video models: check the connection, then reload)"
 SIZE = re.compile(r"\d+x\d+")
-# The exchange takes 1 to 20 seconds.
-SECONDS = re.compile(r"[1-9]|1\d|20")
+# The exchange takes 1 to 30 seconds.
+SECONDS = re.compile(r"[1-9]|[12]\d|30")
 JOB_ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
 
 
@@ -282,7 +282,7 @@ class LiquidVideo:
         if size != "auto" and not SIZE.fullmatch(size):
             return f"size {size!r} is not auto or WIDTHxHEIGHT"
         if seconds != "auto" and not SECONDS.fullmatch(seconds):
-            return f"seconds {seconds!r} is not auto or a whole number from 1 to 20"
+            return f"seconds {seconds!r} is not auto or a whole number from 1 to 30"
         return True
 
     async def generate(

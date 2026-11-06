@@ -214,5 +214,6 @@ def test_the_inputs_list_the_video_models_and_no_input_can_hold_a_key(
     assert widgets["seconds"][0] == ["auto", "4", "5", "8", "10"]
     for name in widgets:
         assert not re.search("key|token|secret|auth|password", name, re.IGNORECASE)
-    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", "21") is not True
+    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", "31") is not True
+    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", "30") is True
     assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "1080x1920", "12") is True
