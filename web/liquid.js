@@ -1,4 +1,4 @@
-// Settings for Liquid Inference.
+// Settings for Architect Inference.
 //
 // The key goes to this package's server route and into a file in the ComfyUI
 // user directory. These settings never call the setter that ComfyUI gives a
@@ -116,10 +116,10 @@ app.registerExtension({
   settings: [
     {
       id: "LiquidInference.ApiKey",
-      category: ["Liquid Inference", "Account", "API key"],
+      category: ["Architect Inference", "Account", "API key"],
       name: "API key",
       tooltip:
-        "Your Liquid Inference API key. It is saved in the ComfyUI user directory, not in workflows or images.",
+        "Your Architect Inference API key. It is saved in the ComfyUI user directory, not in workflows or images.",
       defaultValue: "",
       type: () =>
         field({
@@ -133,7 +133,7 @@ app.registerExtension({
     },
     {
       id: "LiquidInference.BaseUrl",
-      category: ["Liquid Inference", "Account", "Base URL"],
+      category: ["Architect Inference", "Account", "Base URL"],
       name: "Base URL",
       tooltip: "The router address. Clear it to use https://router.inference.ai.exchange/v1.",
       defaultValue: "",

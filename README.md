@@ -1,6 +1,6 @@
-# Liquid Inference for ComfyUI
+# Architect Inference for ComfyUI
 
-Buy images and videos in ComfyUI with Liquid Inference, with a USD cap on each run.
+Buy images and videos in ComfyUI with Architect Inference, with a USD cap on each run.
 Use Nano Banana (Gemini 3.1 Flash Image), Seedream, Seedance, Kling, Veo and FLUX when sellers offer them.
 
 This package adds three nodes to ComfyUI:
@@ -10,7 +10,7 @@ This package adds three nodes to ComfyUI:
 - **Liquid Video Job** gets the video of a job again, with no new charge.
 
 The paid nodes send a text prompt to
-[Liquid Inference](https://inference.ai.exchange), an auction exchange for
+[Architect Inference](https://inference.ai.exchange), an auction exchange for
 inference. Sellers post offers for image and video models. The exchange gives
 your request to the best offer that is under your price cap, and you pay for
 the images or the video that you get.
@@ -22,13 +22,13 @@ the images or the video that you get.
 ## Requirements
 
 - ComfyUI 0.3.45 or newer.
-- A Liquid Inference API key with the `spend` scope, and a balance on the
+- An Architect Inference API key with the `spend` scope, and a balance on the
   account.
 
 ## Install
 
 1. In ComfyUI, open **Manager**, then **Custom Nodes Manager**.
-2. Search for "Liquid Inference".
+2. Search for "Architect Inference".
 3. Select **Install**, then restart ComfyUI.
 
 To install by hand, clone this repository into `ComfyUI/custom_nodes/`, then
@@ -36,7 +36,7 @@ restart ComfyUI. The package has no Python dependencies to install.
 
 ## Sign in
 
-For ComfyUI on this machine, open **Settings > Liquid Inference**, then select **Sign in**.
+For ComfyUI on this machine, open **Settings > Architect Inference**, then select **Sign in**.
 Approve spend access in the new page. Select a spend limit that covers your planned runs.
 The key expires after seven days. When it expires, select **Sign in** again.
 Sign-in uses the default Liquid router and an HTTP loopback address.
@@ -47,7 +47,7 @@ Add funds at <https://inference.ai.exchange/credits> if your balance is too low.
 
 ## Set the API key
 
-1. Open **Settings**, then **Liquid Inference**.
+1. Open **Settings**, then **Architect Inference**.
 2. Paste your key into **API key**.
 3. Select **Save**.
 
@@ -157,7 +157,7 @@ seller keeps the file until the time in `expires_at` in the receipt.
 
 ## Privacy
 
-- The prompt goes to the Liquid Inference router, and then to the seller
+- The prompt goes to the Architect Inference router, and then to the seller
   that wins the auction. The seller can be a different company for each run.
 - The images come back from the seller. If the seller returns a link and not
   the image bytes, the node gets the image from that link. The node does not
@@ -182,7 +182,7 @@ to support to find the job.
 
 | Error | What to do |
 | --- | --- |
-| No Liquid Inference API key | Set the key in Settings, or set `LIQUID_API_KEY`, then try again. |
+| No Architect Inference API key | Set the key in Settings, or set `LIQUID_API_KEY`, then try again. |
 | `no_eligible_offer` with `retention_policy` | For a video, select `retention_policy = allowed` only if you accept content retention. Otherwise, select a different model. |
 | HTTP 401 | The exchange does not know the key. Make a new key and save it. |
 | HTTP 402 `insufficient_balance` | Add funds to your account. |

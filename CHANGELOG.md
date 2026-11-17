@@ -1,6 +1,6 @@
 # Changelog
 
-Each release of the Liquid Inference node for ComfyUI, newest first.
+Each release of the Architect Inference node for ComfyUI, newest first.
 
 ## 0.3.0 -- 2026-10-26
 
@@ -27,8 +27,8 @@ Each release of the Liquid Inference node for ComfyUI, newest first.
 
 ### Added
 
-- show the Liquid Inference icon in the Comfy Registry
-- add the Liquid Inference ComfyUI node
+- show the Architect Inference icon in the Comfy Registry
+- add the Architect Inference ComfyUI node
 
 ### Fixed
 

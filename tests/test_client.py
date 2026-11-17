@@ -200,11 +200,12 @@ def test_an_error_names_the_code_and_the_exclusions(
 def test_an_error_body_that_is_not_json_is_still_readable() -> None:
     message = refusal_message(502, b"<html>Bad gateway</html>", None)
     assert message.startswith(
-        "Liquid Inference answered HTTP 502 with a web page, not with an error from the exchange."
+        "Architect Inference answered HTTP 502 with a web page, "
+        "not with an error from the exchange."
     )
     assert "<html>" not in message
     assert refusal_message(500, b"upstream connect error", None).startswith(
-        'Liquid Inference answered HTTP 500 with "upstream connect error", not'
+        'Architect Inference answered HTTP 500 with "upstream connect error", not'
     )
     assert "with no body" in refusal_message(502, b"", None)
 
@@ -215,7 +216,7 @@ def test_a_proxy_page_is_named_by_its_title_and_not_quoted(router: Stub) -> None
         buy(router)
     message = str(caught.value)
     assert message.startswith(
-        "Liquid Inference answered HTTP 502 with a web page titled "
+        "Architect Inference answered HTTP 502 with a web page titled "
         '"router.inference.ai.exchange | 502: Bad gateway", not with an error from the exchange.'
     )
     assert "<" not in message
@@ -241,7 +242,7 @@ def test_a_model_that_no_seller_serves_says_to_reload_the_list(
     with pytest.raises(LiquidError) as caught:
         buy(router, model="fluently-xl")
     message = str(caught.value)
-    assert message.startswith(f"Liquid Inference refused the request (HTTP {status}, {code}): ")
+    assert message.startswith(f"Architect Inference refused the request (HTTP {status}, {code}): ")
     assert "no seller can serve fluently-xl now" in message
     assert "Reload the page to get the current model list" in message
 
@@ -258,7 +259,7 @@ def test_a_provider_failure_names_the_code_and_not_the_reload(router: Stub) -> N
     with pytest.raises(LiquidError) as caught:
         buy(router)
     assert str(caught.value) == (
-        "Liquid Inference refused the request (HTTP 503, provider_failed): "
+        "Architect Inference refused the request (HTTP 503, provider_failed): "
         "acme could not run this request; you were not charged. Job ID: job-stub-1"
     )
 

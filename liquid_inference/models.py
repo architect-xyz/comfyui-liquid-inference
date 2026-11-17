@@ -242,7 +242,7 @@ class Catalog(Generic[M]):
         try:
             listing = _Listing(router.base_url, self._kind.fetch(router, FETCH_TIMEOUT))
         except Exception as error:
-            log.warning("liquid inference: failed to get the model list: %s", error)
+            log.warning("architect inference: failed to get the model list: %s", error)
             return None
         self._write_cache(listing)
         return listing
@@ -262,7 +262,7 @@ class Catalog(Generic[M]):
         except FileNotFoundError:
             return None
         except (ValueError, KeyError, TypeError, AttributeError) as error:
-            log.warning("liquid inference: ignored an unreadable model cache: %s", error)
+            log.warning("architect inference: ignored an unreadable model cache: %s", error)
             return None
 
     def _write_cache(self, listing: _Listing[M]) -> None:
@@ -278,4 +278,4 @@ class Catalog(Generic[M]):
             temporary.write_text(json.dumps(payload), encoding="utf-8")
             temporary.replace(self._cache_file)
         except OSError as error:
-            log.warning("liquid inference: failed to write the model cache: %s", error)
+            log.warning("architect inference: failed to write the model cache: %s", error)

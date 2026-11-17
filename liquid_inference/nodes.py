@@ -57,7 +57,7 @@ def _reporter(node_id: str | None) -> Callable[[str], None]:
     """Shows a line of text on the node while it waits."""
 
     def report(text: str) -> None:
-        log.info("liquid inference: %s", text)
+        log.info("architect inference: %s", text)
         if node_id is None:
             return
         try:
@@ -65,7 +65,7 @@ def _reporter(node_id: str | None) -> Callable[[str], None]:
 
             PromptServer.instance.send_progress_text(text, node_id)
         except Exception as error:  # an old ComfyUI has no progress text
-            log.debug("liquid inference: no progress text: %s", error)
+            log.debug("architect inference: no progress text: %s", error)
 
     return report
 
@@ -88,7 +88,7 @@ async def _finish(client: Client, job_id: str, node_id: str | None) -> tuple[Any
 
 
 class LiquidImage:
-    CATEGORY = "Liquid Inference"
+    CATEGORY = "Architect Inference"
     FUNCTION = "generate"
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("images", "job_id", "receipt")
@@ -98,9 +98,9 @@ class LiquidImage:
         "JSON with the model, the seller, the charge and the cap for this job.",
     )
     DESCRIPTION = (
-        "External paid API. Each run sends the prompt to Liquid Inference, an auction "
+        "External paid API. Each run sends the prompt to Architect Inference, an auction "
         "exchange. The seller that wins the auction makes the images, and your account pays "
-        "for them, up to the cap. Set the API key in Settings > Liquid Inference."
+        "for them, up to the cap. Set the API key in Settings > Architect Inference."
     )
 
     @classmethod
@@ -147,7 +147,7 @@ class LiquidImage:
         # The router decides which models and sizes it accepts. The local list
         # can be older than the market, so it does not refuse a value.
         if not model or model == NO_MODELS:
-            return "no image model is selected; check the connection to Liquid Inference"
+            return "no image model is selected; check the connection to Architect Inference"
         if size != "auto" and not SIZE.fullmatch(size):
             return f"size {size!r} is not auto or WIDTHxHEIGHT"
         return True
@@ -191,7 +191,7 @@ class LiquidImage:
 
 
 class LiquidVideo:
-    CATEGORY = "Liquid Inference"
+    CATEGORY = "Architect Inference"
     FUNCTION = "generate"
     RETURN_TYPES = ("VIDEO", "STRING", "STRING")
     RETURN_NAMES = ("video", "job_id", "receipt")
@@ -202,10 +202,10 @@ class LiquidVideo:
         "JSON with the model, the seller, the charge, the cap and the file expiry for this job.",
     )
     DESCRIPTION = (
-        "External paid API. Each run buys one video from Liquid Inference, an auction exchange. "
+        "External paid API. Each run buys one video from Architect Inference, an auction exchange. "
         "The seller that wins the auction makes the video, and your account pays for it, up to "
         "the cap. A stop in ComfyUI does not stop the job or its charge. "
-        "Set the API key in Settings > Liquid Inference."
+        "Set the API key in Settings > Architect Inference."
     )
 
     @classmethod
@@ -278,7 +278,7 @@ class LiquidVideo:
         # The router decides which models, sizes and lengths it accepts. The
         # local list can be older than the market, so it does not refuse a value.
         if not model or model == NO_VIDEO_MODELS:
-            return "no video model is selected; check the connection to Liquid Inference"
+            return "no video model is selected; check the connection to Architect Inference"
         if size != "auto" and not SIZE.fullmatch(size):
             return f"size {size!r} is not auto or WIDTHxHEIGHT"
         if seconds != "auto" and not SECONDS.fullmatch(seconds):
@@ -317,7 +317,7 @@ class LiquidVideo:
 
 
 class LiquidVideoJob:
-    CATEGORY = "Liquid Inference"
+    CATEGORY = "Architect Inference"
     FUNCTION = "load"
     RETURN_TYPES = ("VIDEO", "STRING")
     RETURN_NAMES = ("video", "receipt")

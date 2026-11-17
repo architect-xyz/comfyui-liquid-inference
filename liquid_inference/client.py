@@ -1,4 +1,4 @@
-"""HTTP calls to the Liquid Inference router. Standard library only."""
+"""HTTP calls to the Architect Inference router. Standard library only."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
 
 class LiquidError(RuntimeError):
-    """A request to Liquid Inference failed. The message is for the user."""
+    """A request to Architect Inference failed. The message is for the user."""
 
 
 class RetryableError(LiquidError):
@@ -218,13 +218,14 @@ class Client:
     def _require_key(self) -> None:
         if self.key_expired:
             raise LiquidError(
-                "Your Liquid sign-in expired. Select Sign in again in Settings > Liquid Inference."
+                "Your Liquid sign-in expired. "
+                "Select Sign in again in Settings > Architect Inference."
             )
         if not self.api_key:
             raise LiquidError(
-                "No Liquid Inference API key. Select Sign in in Settings > Liquid Inference. "
+                "No Architect Inference API key. Select Sign in in Settings > Architect Inference. "
                 "For a remote server, create a key at https://inference.ai.exchange/keys. "
-                "Paste it in Settings > Liquid Inference. "
+                "Paste it in Settings > Architect Inference. "
                 "You can also set LIQUID_API_KEY before you start ComfyUI."
             )
 
@@ -299,7 +300,7 @@ def _read(response: HTTPResponse) -> tuple[int, str | None, bytes]:
 
 def _unknown(idempotency_key: str, reason: object) -> LiquidError:
     return LiquidError(
-        f"The request to Liquid Inference stopped before an answer came back ({reason}). "
+        f"The request to Architect Inference stopped before an answer came back ({reason}). "
         "The outcome is unknown: the job can have run, and you can have been charged. "
         "The node does not send the request again. "
         f"To find the job, give support this Idempotency-Key: {idempotency_key}."
@@ -369,7 +370,7 @@ def refusal_message(
         # router's answer with its own page. The page does not tell whether
         # the job ran.
         message = (
-            f"Liquid Inference answered HTTP {status} with {_describe(body)}, not with an "
+            f"Architect Inference answered HTTP {status} with {_describe(body)}, not with an "
             "error from the exchange. A proxy between ComfyUI and the exchange can send such "
             "a page. The job can have run. Look at your receipts before you run the node again"
         )
@@ -377,7 +378,7 @@ def refusal_message(
             message += f". Idempotency-Key: {idempotency_key}"
     else:
         code = error.get("code") or "error"
-        message = f"Liquid Inference refused the request (HTTP {status}, {code}): "
+        message = f"Architect Inference refused the request (HTTP {status}, {code}): "
         message += str(error.get("message") or "no message")
         if error.get("param"):
             message += f" [parameter: {error['param']}]"
@@ -386,7 +387,7 @@ def refusal_message(
             message += f". Offers excluded: {reasons}"
         if status == 401:
             message += (
-                ". Select Sign in again in Settings > Liquid Inference. "
+                ". Select Sign in again in Settings > Architect Inference. "
                 "Or replace the saved API key at https://inference.ai.exchange/keys"
             )
         if code == "insufficient_balance":
