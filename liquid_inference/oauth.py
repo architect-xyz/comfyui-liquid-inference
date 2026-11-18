@@ -90,7 +90,9 @@ class SignIn:
             )
         key = self.config.api_key()
         if key and key.source == "environment":
-            raise ValueError("LIQUID_API_KEY has priority. Change that variable to change the key.")
+            raise ValueError(
+                "ARCHITECT_API_KEY has priority. Change that variable to change the key."
+            )
         if self.config.base_url().value != DEFAULT_BASE_URL:
             raise ValueError(
                 "Sign in uses the default Liquid router. For a custom router, paste an API key."

@@ -77,8 +77,8 @@ def test_each_request_has_the_cap_a_new_idempotency_key_and_the_user_agent(route
     buy(router, cap_usd=0.05)
     buy(router, cap_usd=1e-3)
     first, second = router.calls(GENERATE)
-    assert first.headers["x-liquid-cap-usd"] == "0.05"
-    assert second.headers["x-liquid-cap-usd"] == "0.001"
+    assert first.headers["x-architect-cap-usd"] == "0.05"
+    assert second.headers["x-architect-cap-usd"] == "0.001"
     keys = {first.headers["idempotency-key"], second.headers["idempotency-key"]}
     assert len(keys) == 2
     for key in keys:
@@ -122,7 +122,7 @@ def test_a_router_that_cannot_be_reached_is_not_a_charge() -> None:
 
 
 def test_a_missing_key_stops_before_any_request(router: Stub) -> None:
-    with pytest.raises(LiquidError, match="LIQUID_API_KEY"):
+    with pytest.raises(LiquidError, match="ARCHITECT_API_KEY"):
         Client(f"{router.base}/v1", None).generate(
             model="m", prompt="p", n=1, size=None, cap_usd=0.05
         )

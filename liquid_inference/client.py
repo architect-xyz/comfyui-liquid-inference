@@ -26,7 +26,7 @@ MAX_VIDEO_BYTES = 512 * 1024 * 1024
 # One status read or one download, not the whole wait for a video job.
 READ_TIMEOUT = 30.0
 DOWNLOAD_TIMEOUT = 300.0
-JOB_HEADER = "x-liquid-job-id"
+JOB_HEADER = "x-architect-job-id"
 # Codes that say that no seller can serve the selected model now. The model
 # list of the node is from when the page loaded, so it can be old.
 MODEL_LIST_CODES = frozenset({"model_not_found", "model_unavailable"})
@@ -226,7 +226,7 @@ class Client:
                 "No Architect Inference API key. Select Sign in in Settings > Architect Inference. "
                 "For a remote server, create a key at https://inference.ai.exchange/keys. "
                 "Paste it in Settings > Architect Inference. "
-                "You can also set LIQUID_API_KEY before you start ComfyUI."
+                "You can also set ARCHITECT_API_KEY before you start ComfyUI."
             )
 
     def _buy(self, path: str, payload: dict[str, Any], cap_usd: float) -> tuple[Any, str | None]:
@@ -235,7 +235,7 @@ class Client:
         idempotency_key = str(uuid.uuid4())
         headers = self._headers()
         headers["Content-Type"] = "application/json"
-        headers["x-liquid-cap-usd"] = format_usd(cap_usd)
+        headers["x-architect-cap-usd"] = format_usd(cap_usd)
         headers["Idempotency-Key"] = idempotency_key
         request = urllib.request.Request(
             f"{self.base_url}{path}",

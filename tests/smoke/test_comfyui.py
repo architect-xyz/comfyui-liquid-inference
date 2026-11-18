@@ -251,7 +251,7 @@ def test_an_example_workflow_saves_images_without_the_key(
     assert len(posts) == liquid_nodes
     for request in posts:
         assert request.headers["authorization"] == f"Bearer {SENTINEL}"
-        assert request.headers["x-liquid-cap-usd"] == "0.1"
+        assert request.headers["x-architect-cap-usd"] == "0.1"
         assert "size" not in request.json()
 
     written = set(output.rglob("*.png")) - before
@@ -288,7 +288,7 @@ def test_an_example_workflow_saves_a_video_without_the_key(
 
     (create,) = stub.calls("/v1/videos")[posts_before:]
     assert create.headers["authorization"] == f"Bearer {SENTINEL}"
-    assert create.headers["x-liquid-cap-usd"] == "1"
+    assert create.headers["x-architect-cap-usd"] == "1"
     assert create.json()["exchange"]["retention_policy"] == (retention_policy or "none")
     starts = any(node["type"] == "LoadImage" for node in workflow["nodes"])
     assert ("input_reference" in create.json()) == starts

@@ -19,8 +19,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 DEFAULT_BASE_URL = "https://router.inference.ai.exchange/v1"
-KEY_ENV = "LIQUID_API_KEY"
-BASE_URL_ENV = "LIQUID_BASE_URL"
+KEY_ENV = "ARCHITECT_API_KEY"
+BASE_URL_ENV = "ARCHITECT_BASE_URL"
+# The names before the rename. They still work.
+LEGACY_KEY_ENV = "LIQUID_API_KEY"
+LEGACY_BASE_URL_ENV = "LIQUID_BASE_URL"
 MAX_KEY_LENGTH = 1024
 
 
@@ -51,7 +54,7 @@ class Config:
         return self.directory / "base_url"
 
     def api_key(self) -> Setting | None:
-        key = self.environ.get(KEY_ENV, "").strip()
+        key = (self.environ.get(KEY_ENV) or self.environ.get(LEGACY_KEY_ENV) or "").strip()
         if key:
             return Setting(key, "environment")
         key = _read(self.key_file)
@@ -92,7 +95,9 @@ class Config:
             return False
 
     def base_url(self) -> Setting:
-        url = self.environ.get(BASE_URL_ENV, "").strip()
+        url = (
+            self.environ.get(BASE_URL_ENV) or self.environ.get(LEGACY_BASE_URL_ENV) or ""
+        ).strip()
         if url:
             return Setting(normalize_base_url(url), "environment")
         url = _read(self.base_url_file)

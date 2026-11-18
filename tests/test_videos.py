@@ -70,7 +70,7 @@ def test_one_purchase_then_reads_until_the_file_comes(
     assert create.json() == {"model": "google/veo-3.1", "prompt": "a red square",
                              "size": "1280x720", "seconds": "4",
                              "exchange": {"retention_policy": "none"}}  # fmt: skip
-    assert create.headers["x-liquid-cap-usd"] == "0.8"
+    assert create.headers["x-architect-cap-usd"] == "0.8"
     assert create.headers["authorization"] == f"Bearer {KEY}"
     assert video == CLIP
     assert job_id == VIDEO_JOB

@@ -200,7 +200,7 @@ def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
             if self.path != "/v1/images/generations":
                 self._send(404, b"{}", "application/json", {})
                 return
-            job = {"x-liquid-job-id": "job-stub-1"}
+            job = {"x-architect-job-id": "job-stub-1"}
             if stub.mode == "error":
                 self._send(stub.status, json.dumps(stub.error).encode(), "application/json", job)
                 return
@@ -230,7 +230,7 @@ def _handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
             self._send(200, json.dumps(answer).encode(), "application/json", job)
 
         def _create_video(self) -> None:
-            job = {"x-liquid-job-id": VIDEO_JOB}
+            job = {"x-architect-job-id": VIDEO_JOB}
             if stub.mode == "error":
                 self._send(stub.status, json.dumps(stub.error).encode(), "application/json", job)
                 return
