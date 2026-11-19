@@ -1,7 +1,7 @@
 """Runs the example workflows in a real ComfyUI against the stub router.
 
 Run it with `uv run pytest -m smoke`. It installs a pinned ComfyUI release
-and CPU torch, so the first run takes some minutes. Set LIQUID_SMOKE_DIR to
+and CPU torch, so the first run takes some minutes. Set INFERENCE_SMOKE_DIR to
 keep the installation for the next run.
 """
 
@@ -39,7 +39,7 @@ WIDGET_TYPES = {"INT", "FLOAT", "STRING", "BOOLEAN", "COMBO"}
 # A combo whose value adds inputs, such as `format` of Save Video. The API
 # names an added input `<combo>.<input>`.
 DYNAMIC_COMBO = "COMFY_DYNAMICCOMBO_V3"
-LIQUID_NODES = {"LiquidImage", "LiquidVideo"}
+INFERENCE_NODES = {"LiquidImage", "LiquidVideo"}
 
 pytestmark = pytest.mark.smoke
 
@@ -115,7 +115,7 @@ def _dynamic(name: str, options: dict[str, Any], values: list[Any]) -> dict[str,
 
 @pytest.fixture(scope="module")
 def comfyui() -> Iterator[tuple[str, Path, Path, Stub]]:
-    keep = os.environ.get("LIQUID_SMOKE_DIR")
+    keep = os.environ.get("INFERENCE_SMOKE_DIR")
     root = Path(keep) if keep else Path(tempfile.mkdtemp(prefix="liquid-smoke-"))
     root.mkdir(parents=True, exist_ok=True)
     python = install(root)
@@ -226,7 +226,7 @@ def example(base: str, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = json.loads(text)
     prompt = to_api(workflow, get(f"{base}/object_info"))
     for node in prompt.values():
-        if node["class_type"] in LIQUID_NODES:
+        if node["class_type"] in INFERENCE_NODES:
             node["inputs"]["prompt"] += f" ({path.stem})"
     return workflow, prompt
 

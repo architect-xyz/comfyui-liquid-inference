@@ -228,7 +228,7 @@ key. The first run takes some minutes.
 uv run pytest -m smoke
 ```
 
-To keep the ComfyUI installation for the next run, set `LIQUID_SMOKE_DIR` to
+To keep the ComfyUI installation for the next run, set `INFERENCE_SMOKE_DIR` to
 a folder.
 
 ## Contribute
