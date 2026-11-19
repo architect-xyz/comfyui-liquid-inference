@@ -303,7 +303,7 @@ def test_a_second_queue_with_the_same_inputs_does_not_buy_again(
     comfyui: tuple[str, Path, Path, Stub],
 ) -> None:
     base, _, _, stub = comfyui
-    path = PACKAGE / "example_workflows" / "liquid_text_to_image.json"
+    path = PACKAGE / "example_workflows" / "architect_text_to_image.json"
     workflow, prompt = example(base, path)
     for node in prompt.values():
         if node["class_type"] == "LiquidImage":
