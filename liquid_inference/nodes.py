@@ -197,7 +197,8 @@ class LiquidVideo:
     RETURN_NAMES = ("video", "job_id", "receipt")
     OUTPUT_TOOLTIPS = (
         "The video file. Connect it to Save Video, or to Get Video Components for the frames.",
-        "The exchange's ID for this job. A Liquid Video Job node can get the video again "
+        "The exchange's ID for this job. An Architect Inference Video Job node can get the video "
+        "again "
         "with this ID, with no new charge. Give it to support with each question about a charge.",
         "JSON with the model, the seller, the charge, the cap and the file expiry for this job.",
     )
@@ -326,7 +327,8 @@ class LiquidVideoJob:
         "JSON with the model, the seller, the charge, the cap and the file expiry for this job.",
     )
     DESCRIPTION = (
-        "Gets the video of a job that a Liquid Video node bought. This node buys nothing. "
+        "Gets the video of a job that an Architect Inference Video node bought. This node buys "
+        "nothing. "
         "Use it when a run stopped after the purchase. The seller keeps the file until the "
         "expiry in the receipt."
     )
@@ -337,7 +339,10 @@ class LiquidVideoJob:
             "required": {
                 "job_id": (
                     "STRING",
-                    {"default": "", "tooltip": "The job ID from a Liquid Video node or an error."},
+                    {
+                        "default": "",
+                        "tooltip": "The job ID from an Architect Inference Video node or an error.",
+                    },
                 ),
             },
             "hidden": {"unique_id": "UNIQUE_ID"},
@@ -359,7 +364,7 @@ NODE_CLASS_MAPPINGS = {
     "LiquidVideoJob": LiquidVideoJob,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LiquidImage": "Liquid Image (paid API)",
-    "LiquidVideo": "Liquid Video (paid API)",
-    "LiquidVideoJob": "Liquid Video Job",
+    "LiquidImage": "Architect Inference Image (paid API)",
+    "LiquidVideo": "Architect Inference Video (paid API)",
+    "LiquidVideoJob": "Architect Inference Video Job",
 }

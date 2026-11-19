@@ -95,7 +95,8 @@ class SignIn:
             )
         if self.config.base_url().value != DEFAULT_BASE_URL:
             raise ValueError(
-                "Sign in uses the default Liquid router. For a custom router, paste an API key."
+                "Sign in uses the default Architect Inference router. For a custom router, paste "
+                "an API key."
             )
         pending = Pending(
             secrets.token_urlsafe(32), secrets.token_urlsafe(64), origin, self._clock() + TTL

@@ -218,7 +218,7 @@ class Client:
     def _require_key(self) -> None:
         if self.key_expired:
             raise LiquidError(
-                "Your Liquid sign-in expired. "
+                "Your Architect Inference sign-in expired. "
                 "Select Sign in again in Settings > Architect Inference."
             )
         if not self.api_key:

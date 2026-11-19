@@ -36,8 +36,8 @@ Clock = Callable[[], float]
 def still_charged(job_id: str) -> str:
     return (
         f"The job keeps running at the seller, and the exchange charges for it when it ends. "
-        f"To get the video later with no new charge, put job ID {job_id} in a "
-        "Liquid Video Job node."
+        f"To get the video later with no new charge, put job ID {job_id} in an "
+        "Architect Inference Video Job node."
     )
 
 
@@ -98,8 +98,8 @@ async def download(
             if attempt >= tries:
                 raise LiquidError(
                     f"Job {job_id} is complete and charged, but the download failed: {error}. "
-                    f"To try again with no new charge, put job ID {job_id} in a "
-                    "Liquid Video Job node."
+                    f"To try again with no new charge, put job ID {job_id} in an "
+                    "Architect Inference Video Job node."
                 ) from None
         attempt += 1
         await _sleep(pause, interrupted, job_id, clock)

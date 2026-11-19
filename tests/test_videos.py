@@ -161,7 +161,9 @@ def test_failed_reads_are_tried_again_and_the_clip_still_comes(
 
 def test_too_many_failed_reads_stop_with_the_job_id(router: Stub, client: Client) -> None:
     router.answer_statuses(video_error("storage_unavailable"))
-    with pytest.raises(LiquidError, match=f"put job ID {VIDEO_JOB} in a Liquid Video Job node"):
+    with pytest.raises(
+        LiquidError, match=f"put job ID {VIDEO_JOB} in an Architect Inference Video Job node"
+    ):
         wait(client)
     assert len(router.calls(STATUS)) == videos.MAX_FAILED_READS + 1
 

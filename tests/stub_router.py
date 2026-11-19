@@ -38,7 +38,7 @@ IMAGE_CARDS: list[dict[str, Any]] = [
         "kind": "image_generation",
         "image_sizes": ["1536x1024", "1024x1024"],
     },
-    {"id": "liquid.auto", "object": "model", "match_type": "router"},
+    {"id": "architect.auto", "object": "model", "match_type": "router"},
 ]
 
 # The entries of `GET /v1/exchange/models?kind=video`, keyed by `model`.

@@ -5,9 +5,9 @@ Use Nano Banana (Gemini 3.1 Flash Image), Seedream, Seedance, Kling, Veo and FLU
 
 This package adds three nodes to ComfyUI:
 
-- **Liquid Image (paid API)** buys images.
-- **Liquid Video (paid API)** buys a video.
-- **Liquid Video Job** gets the video of a job again, with no new charge.
+- **Architect Inference Image (paid API)** buys images.
+- **Architect Inference Video (paid API)** buys a video.
+- **Architect Inference Video Job** gets the video of a job again, with no new charge.
 
 The paid nodes send a text prompt to
 [Architect Inference](https://inference.ai.exchange), an auction exchange for
@@ -39,7 +39,7 @@ restart ComfyUI. The package has no Python dependencies to install.
 For ComfyUI on this machine, open **Settings > Architect Inference**, then select **Sign in**.
 Approve spend access in the new page. Select a spend limit that covers your planned runs.
 The key expires after seven days. When it expires, select **Sign in** again.
-Sign-in uses the default Liquid router and an HTTP loopback address.
+Sign-in uses the default Architect Inference router and an HTTP loopback address.
 
 For a remote ComfyUI server, create a key at <https://inference.ai.exchange/keys>.
 Paste that key with the steps below.
@@ -65,7 +65,7 @@ would thus go to each person who gets one of your images or workflows.
 
 ## Buy images
 
-1. Double-click the canvas and search for "Liquid Image".
+1. Double-click the canvas and search for "Architect Inference Image".
 2. Write a prompt, and select a model.
 3. Connect `images` to **Save Image** or to a different image node.
 4. Queue the workflow.
@@ -85,7 +85,7 @@ video. In ComfyUI, open them from **Templates**.
 | `cap_usd` | The most that one run of the node can cost, in USD. |
 
 The cap applies to each request, not to the workflow. A workflow with three
-Liquid nodes and a cap of 0.05 can cost up to 0.15 USD for each run. If you
+Architect Inference nodes and a cap of 0.05 can cost up to 0.15 USD for each run. If you
 queue the workflow ten times, each run is a new request with its own cap.
 
 ComfyUI does not run a node again when its inputs did not change. Thus a
@@ -102,7 +102,7 @@ an input to buy new images.
 
 ## Buy a video
 
-1. Double-click the canvas and search for "Liquid Video".
+1. Double-click the canvas and search for "Architect Inference Video".
 2. Write a prompt, and select a model.
 3. Connect `video` to **Save Video**.
 4. Queue the workflow.
@@ -145,10 +145,10 @@ A stop in ComfyUI stops the wait, not the job. The exchange has no route to
 cancel a video job. The seller continues, and the exchange charges for the
 video when the job is complete. The error gives the job ID.
 
-To get the video of a job that you paid for, use the **Liquid Video Job**
+To get the video of a job that you paid for, use the **Architect Inference Video Job**
 node:
 
-1. Add a **Liquid Video Job** node.
+1. Add a **Architect Inference Video Job** node.
 2. Paste the job ID into `job_id`.
 3. Connect `video` to **Save Video**, and queue the workflow.
 
@@ -195,7 +195,7 @@ to support to find the job.
 | HTTP 502 or 504 with a web page | A proxy between ComfyUI and the exchange answered. Look at your receipts before you run the node again. |
 | The model list shows "no image models" or "no video models" | ComfyUI could not get the model list. Check the network and the base URL, then reload the page. |
 | A video job failed | The seller did not make the video, and you were not charged. Run the node again, or select a different model. |
-| The node stopped waiting for a video job | The job continues, and the exchange charges for it. Put the job ID in a **Liquid Video Job** node to get the video. |
+| The node stopped waiting for a video job | The job continues, and the exchange charges for it. Put the job ID in a **Architect Inference Video Job** node to get the video. |
 | HTTP 410 `video_expired` | The seller deleted the file. Look at the job's receipt for the charge. |
 | The outcome is unknown | Do not run the node again at once. Look at your receipts, or give the `Idempotency-Key` to support. |
 

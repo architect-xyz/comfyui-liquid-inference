@@ -181,7 +181,7 @@ def comfyui() -> Iterator[tuple[str, Path, Path, Stub]]:
 def test_the_node_loads_without_import_errors(comfyui: tuple[str, Path, Path, Stub]) -> None:
     base, _, run_dir, _ = comfyui
     info = get(f"{base}/object_info/LiquidImage")["LiquidImage"]
-    assert info["display_name"] == "Liquid Image (paid API)"
+    assert info["display_name"] == "Architect Inference Image (paid API)"
     assert "blackforestlabs/flux-schnell" in info["input"]["required"]["model"][0]
     info = get(f"{base}/object_info/LiquidVideo")["LiquidVideo"]
     assert info["output"] == ["VIDEO", "STRING", "STRING"]
