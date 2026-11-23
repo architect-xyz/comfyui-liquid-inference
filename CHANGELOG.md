@@ -2,6 +2,18 @@
 
 Each release of the Architect Inference node for ComfyUI, newest first.
 
+## 0.3.1 -- 2026-11-23
+
+### Fixed
+
+- select models with a live offer in the templates and the Registry text
+
+### Changed
+
+- rebrand the node as Architect Inference
+- rename the last LIQUID_ environment names to INFERENCE_
+- rename the project folder, dashboards, volumes, canary packages, the pet and the ComfyUI folder
+
 ## 0.3.0 -- 2026-10-26
 
 ### Added
