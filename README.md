@@ -1,7 +1,7 @@
 # Architect Inference for ComfyUI
 
 Buy images and videos in ComfyUI with Architect Inference, with a USD cap on each run.
-Use Nano Banana (Gemini 3.1 Flash Image), Seedream, Seedance, Kling, Veo and FLUX when sellers offer them.
+Use Nano Banana (Gemini 3.1 Flash Image), Seedream, Seedance, Kling and FLUX when sellers offer them.
 
 This package adds three nodes to ComfyUI:
 

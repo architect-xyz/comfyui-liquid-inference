@@ -43,7 +43,7 @@
       },
       "widgets_values": [
         "A red fox in fresh snow at sunrise, soft light, photograph",
-        "bytedance/seedream-4.5",
+        "seedream-v5.0-lite",
         "auto",
         1,
         0.1
@@ -88,7 +88,7 @@
       },
       "widgets_values": [
         "A red fox in fresh snow at sunrise, soft light, photograph",
-        "alibaba/qwen-image-2.0",
+        "qwen-image-max",
         "auto",
         1,
         0.1

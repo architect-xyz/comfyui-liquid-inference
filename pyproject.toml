@@ -1,6 +1,6 @@
 [project]
 classifiers = ["Operating System :: OS Independent"]
-description = "Nano Banana, Seedream, Seedance, Kling, Veo and FLUX in ComfyUI through Architect Inference, with a USD cap on each run."
+description = "Nano Banana, Seedream, Seedance, Kling and FLUX in ComfyUI through Architect Inference, with a USD cap on each run."
 license = { file = "LICENSE" }
 name = "liquid-inference"
 readme = "README.md"
