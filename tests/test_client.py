@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 from stub_router import Stub, png
 
-from liquid_inference import __version__
-from liquid_inference.client import Client, LiquidError, refusal_message
-from liquid_inference.images import decode_batch
+from architect_inference import __version__
+from architect_inference.client import ArchitectError, Client, refusal_message
+from architect_inference.images import decode_batch
 
 KEY = "lq_test_key_123"
 GENERATE = "/v1/images/generations"
@@ -83,7 +83,7 @@ def test_each_request_has_the_cap_a_new_idempotency_key_and_the_user_agent(route
     assert len(keys) == 2
     for key in keys:
         uuid.UUID(key)
-    assert first.headers["user-agent"] == f"liquid-comfyui/{__version__}"
+    assert first.headers["user-agent"] == f"architect-comfyui/{__version__}"
     assert first.headers["content-type"] == "application/json"
 
 
@@ -92,7 +92,7 @@ def test_a_refusal_is_not_sent_again(router: Stub) -> None:
     router.error = {
         "error": {"message": "no offer met the requirements", "code": "no_eligible_offer"}
     }
-    with pytest.raises(LiquidError, match="no_eligible_offer"):
+    with pytest.raises(ArchitectError, match="no_eligible_offer"):
         buy(router)
     time.sleep(0.2)
     assert len(router.calls(GENERATE)) == 1
@@ -100,7 +100,7 @@ def test_a_refusal_is_not_sent_again(router: Stub) -> None:
 
 def test_a_timeout_is_not_sent_again_and_says_the_outcome_is_unknown(router: Stub) -> None:
     router.delay = 1.0
-    with pytest.raises(LiquidError) as caught:
+    with pytest.raises(ArchitectError) as caught:
         client(router, timeout=0.2).generate(model="m", prompt="p", n=1, size=None, cap_usd=0.05)
     time.sleep(1.2)
     (post,) = router.calls(GENERATE)
@@ -115,14 +115,14 @@ def test_a_router_that_cannot_be_reached_is_not_a_charge() -> None:
     with socket.socket() as reserved:
         reserved.bind(("127.0.0.1", 0))
         port = reserved.getsockname()[1]
-    with pytest.raises(LiquidError, match="no charge"):
+    with pytest.raises(ArchitectError, match="no charge"):
         Client(f"http://127.0.0.1:{port}/v1", KEY).generate(
             model="m", prompt="p", n=1, size=None, cap_usd=0.05
         )
 
 
 def test_a_missing_key_stops_before_any_request(router: Stub) -> None:
-    with pytest.raises(LiquidError, match="ARCHITECT_API_KEY"):
+    with pytest.raises(ArchitectError, match="ARCHITECT_API_KEY"):
         Client(f"{router.base}/v1", None).generate(
             model="m", prompt="p", n=1, size=None, cap_usd=0.05
         )
@@ -190,7 +190,7 @@ def test_an_error_names_the_code_and_the_exclusions(
     router: Stub, status: int, body: dict[str, object], expected: list[str]
 ) -> None:
     router.mode, router.status, router.error = "error", status, body
-    with pytest.raises(LiquidError) as caught:
+    with pytest.raises(ArchitectError) as caught:
         buy(router)
     message = str(caught.value)
     for text in [*expected, "Job ID: job-stub-1"]:
@@ -212,7 +212,7 @@ def test_an_error_body_that_is_not_json_is_still_readable() -> None:
 
 def test_a_proxy_page_is_named_by_its_title_and_not_quoted(router: Stub) -> None:
     router.mode, router.status = "page", 502
-    with pytest.raises(LiquidError) as caught:
+    with pytest.raises(ArchitectError) as caught:
         buy(router)
     message = str(caught.value)
     assert message.startswith(
@@ -239,7 +239,7 @@ def test_a_model_that_no_seller_serves_says_to_reload_the_list(
             "param": "model",
         }
     }
-    with pytest.raises(LiquidError) as caught:
+    with pytest.raises(ArchitectError) as caught:
         buy(router, model="fluently-xl")
     message = str(caught.value)
     assert message.startswith(f"Architect Inference refused the request (HTTP {status}, {code}): ")
@@ -256,7 +256,7 @@ def test_a_provider_failure_names_the_code_and_not_the_reload(router: Stub) -> N
             "provider": "acme",
         }
     }
-    with pytest.raises(LiquidError) as caught:
+    with pytest.raises(ArchitectError) as caught:
         buy(router)
     assert str(caught.value) == (
         "Architect Inference refused the request (HTTP 503, provider_failed): "
@@ -266,13 +266,13 @@ def test_a_provider_failure_names_the_code_and_not_the_reload(router: Stub) -> N
 
 def test_expired_sign_in_never_sends_a_purchase(router: Stub) -> None:
     client = Client(f"{router.base}/v1", "saved-key", key_expired=True)
-    with pytest.raises(LiquidError, match="Sign in again"):
+    with pytest.raises(ArchitectError, match="Sign in again"):
         client.generate(model="image", prompt="fox", n=1, size=None, cap_usd=0.1)
     assert not router.calls("/v1/images/generations")
 
 
 def test_account_refusals_give_the_next_step() -> None:
-    from liquid_inference.client import refusal_message
+    from architect_inference.client import refusal_message
 
     low_balance = json.dumps(
         {"error": {"code": "insufficient_balance", "message": "need $0.20, balance $0.02"}}

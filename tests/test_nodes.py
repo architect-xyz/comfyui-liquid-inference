@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 from stub_router import Stub, dead_base
 
-from liquid_inference import __version__, nodes
-from liquid_inference.client import Client
-from liquid_inference.models import IMAGES, Catalog
+from architect_inference import __version__, nodes
+from architect_inference.client import Client
+from architect_inference.models import IMAGES, Catalog
 
 KEY = "lq_node_key_7"
 

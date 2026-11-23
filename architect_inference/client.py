@@ -18,7 +18,7 @@ from urllib.parse import quote, urlsplit
 
 from . import __version__
 
-USER_AGENT = f"liquid-comfyui/{__version__}"
+USER_AGENT = f"architect-comfyui/{__version__}"
 # An image job can wait in a queue at the seller before it starts.
 GENERATION_TIMEOUT = 300.0
 MAX_IMAGE_BYTES = 64 * 1024 * 1024
@@ -33,11 +33,11 @@ MODEL_LIST_CODES = frozenset({"model_not_found", "model_unavailable"})
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
 
-class LiquidError(RuntimeError):
+class ArchitectError(RuntimeError):
     """A request to Architect Inference failed. The message is for the user."""
 
 
-class RetryableError(LiquidError):
+class RetryableError(ArchitectError):
     """A read failed in a way that the next try can fix.
 
     Only a read is tried again. A purchase is never sent twice.
@@ -112,7 +112,7 @@ class Client:
         with _router.open(request, timeout=timeout) as response:
             body = json.load(response)
         if not isinstance(body, list):
-            raise LiquidError(f"the {kind} model list is not a JSON array")
+            raise ArchitectError(f"the {kind} model list is not a JSON array")
         return [entry for entry in body if isinstance(entry, dict)]
 
     def list_models(self, timeout: float) -> list[dict[str, Any]]:
@@ -126,7 +126,7 @@ class Client:
             body = json.load(response)
         data = body.get("data") if isinstance(body, dict) else None
         if not isinstance(data, list):
-            raise LiquidError("the model list has no `data` array")
+            raise ArchitectError("the model list has no `data` array")
         return [card for card in data if isinstance(card, dict)]
 
     def generate(
@@ -150,7 +150,7 @@ class Client:
         job_id = str(exchange.get("job_id") or job_header or "")
         items = body.get("data") if isinstance(body, dict) else None
         if not isinstance(items, list) or not items:
-            raise LiquidError(
+            raise ArchitectError(
                 f"The router returned no images for job {job_id or 'unknown'}. "
                 "Look at the job's receipt before you run the node again."
             )
@@ -174,7 +174,7 @@ class Client:
         returns, and the exchange charges for it when it ends.
         """
         if retention_policy not in {"none", "allowed"}:
-            raise LiquidError("retention_policy must be none or allowed.")
+            raise ArchitectError("retention_policy must be none or allowed.")
         payload: dict[str, Any] = {
             "model": model,
             "prompt": prompt,
@@ -190,7 +190,7 @@ class Client:
         job_id = body.get("id") if isinstance(body, dict) else None
         job_id = str(job_id or job_header or "")
         if not job_id:
-            raise LiquidError(
+            raise ArchitectError(
                 "The router accepted the video job but returned no job ID. "
                 "Look at your receipts before you run the node again."
             )
@@ -212,17 +212,17 @@ class Client:
         path = f"/videos/{quote(job_id, safe='')}/content"
         data = self._get(path, job_id, MAX_VIDEO_BYTES, DOWNLOAD_TIMEOUT)
         if len(data) > MAX_VIDEO_BYTES:
-            raise LiquidError(f"Job {job_id}: the video is larger than 512 MiB.")
+            raise ArchitectError(f"Job {job_id}: the video is larger than 512 MiB.")
         return data
 
     def _require_key(self) -> None:
         if self.key_expired:
-            raise LiquidError(
+            raise ArchitectError(
                 "Your Architect Inference sign-in expired. "
                 "Select Sign in again in Settings > Architect Inference."
             )
         if not self.api_key:
-            raise LiquidError(
+            raise ArchitectError(
                 "No Architect Inference API key. Select Sign in in Settings > Architect Inference. "
                 "For a remote server, create a key at https://inference.ai.exchange/keys. "
                 "Paste it in Settings > Architect Inference. "
@@ -248,12 +248,12 @@ class Client:
                 status, job_header, raw = _read(response)
         except urllib.error.HTTPError as error:
             body = error.read()
-            raise LiquidError(
+            raise ArchitectError(
                 refusal_message(error.code, body, error.headers.get(JOB_HEADER), idempotency_key)
             ) from None
         except urllib.error.URLError as error:
             if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror)):
-                raise LiquidError(
+                raise ArchitectError(
                     f"Could not connect to {self.base_url}: {error.reason}. "
                     "The request was not sent, so there is no charge."
                 ) from None
@@ -264,7 +264,7 @@ class Client:
         try:
             return json.loads(raw), job_header
         except ValueError:
-            raise LiquidError(
+            raise ArchitectError(
                 f"The router answered HTTP {status} with a body that is not JSON. "
                 f"Job ID: {job_header or 'unknown'}. Idempotency-Key: {idempotency_key}."
             ) from None
@@ -282,7 +282,7 @@ class Client:
             message = refusal_message(error.code, body, job_id)
             if error.code >= 500 or error.code == 429 or _code(body) in RETRYABLE_CODES:
                 raise RetryableError(message) from None
-            raise LiquidError(message) from None
+            raise ArchitectError(message) from None
         except (urllib.error.URLError, TimeoutError, OSError, HTTPException) as error:
             reason = error.reason if isinstance(error, urllib.error.URLError) else error
             raise RetryableError(f"the request to {self.base_url} failed: {reason}") from None
@@ -298,8 +298,8 @@ def _read(response: HTTPResponse) -> tuple[int, str | None, bytes]:
     return response.status, response.headers.get(JOB_HEADER), response.read()
 
 
-def _unknown(idempotency_key: str, reason: object) -> LiquidError:
-    return LiquidError(
+def _unknown(idempotency_key: str, reason: object) -> ArchitectError:
+    return ArchitectError(
         f"The request to Architect Inference stopped before an answer came back ({reason}). "
         "The outcome is unknown: the job can have run, and you can have been charged. "
         "The node does not send the request again. "
@@ -309,21 +309,21 @@ def _unknown(idempotency_key: str, reason: object) -> LiquidError:
 
 def _image_bytes(item: object, job_id: str) -> bytes:
     if not isinstance(item, dict):
-        raise LiquidError(f"Job {job_id}: an image in the answer is not an object.")
+        raise ArchitectError(f"Job {job_id}: an image in the answer is not an object.")
     encoded = item.get("b64_json")
     if isinstance(encoded, str) and encoded:
         return _decode_base64(encoded, job_id)
     url = item.get("url")
     if isinstance(url, str) and url:
         return download(url, job_id)
-    raise LiquidError(f"Job {job_id}: an image in the answer has no `b64_json` and no `url`.")
+    raise ArchitectError(f"Job {job_id}: an image in the answer has no `b64_json` and no `url`.")
 
 
 def _decode_base64(encoded: str, job_id: str) -> bytes:
     try:
         return base64.b64decode(encoded)
     except (binascii.Error, ValueError):
-        raise LiquidError(f"Job {job_id}: an image is not valid base64.") from None
+        raise ArchitectError(f"Job {job_id}: an image is not valid base64.") from None
 
 
 def download(url: str, job_id: str, *, timeout: float = GENERATION_TIMEOUT) -> bytes:
@@ -337,18 +337,18 @@ def download(url: str, job_id: str, *, timeout: float = GENERATION_TIMEOUT) -> b
         return _decode_base64(encoded, job_id)
     host = urlsplit(url).hostname or url
     if urlsplit(url).scheme not in ("http", "https"):
-        raise LiquidError(f"Job {job_id}: the image link {url!r} is not an http or https URL.")
+        raise ArchitectError(f"Job {job_id}: the image link {url!r} is not an http or https URL.")
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with _downloads.open(request, timeout=timeout) as response:
             data: bytes = response.read(MAX_IMAGE_BYTES + 1)
     except (urllib.error.URLError, TimeoutError, OSError, HTTPException) as error:
-        raise LiquidError(
+        raise ArchitectError(
             f"Job {job_id} was charged, but the image download from {host} failed: {error}. "
             "Look at the job's receipt for the image link."
         ) from None
     if len(data) > MAX_IMAGE_BYTES:
-        raise LiquidError(f"Job {job_id}: the image from {host} is larger than 64 MiB.")
+        raise ArchitectError(f"Job {job_id}: the image from {host} is larger than 64 MiB.")
     return data
 
 

@@ -131,9 +131,10 @@ def register(config: Callable[[], Config]) -> None:
     async def post_base_url(request: Any) -> Any:
         return answer(store_base_url(config(), request.content_type, await request.read()))
 
-    routes.get("/liquid-inference/prices")(get_prices)
-    routes.get("/liquid-inference/status")(get_status)
-    routes.post("/liquid-inference/sign-in")(post_sign_in)
-    routes.get("/liquid-inference/callback")(callback)
-    routes.post("/liquid-inference/key")(post_key)
-    routes.post("/liquid-inference/base-url")(post_base_url)
+    for prefix in ("/architect-inference", "/liquid-inference"):
+        routes.get(f"{prefix}/prices")(get_prices)
+        routes.get(f"{prefix}/status")(get_status)
+        routes.post(f"{prefix}/sign-in")(post_sign_in)
+        routes.get(f"{prefix}/callback")(callback)
+        routes.post(f"{prefix}/key")(post_key)
+        routes.post(f"{prefix}/base-url")(post_base_url)

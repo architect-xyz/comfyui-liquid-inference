@@ -214,7 +214,7 @@ class Catalog(Generic[M]):
                 self._refresh = threading.Thread(
                     target=self._refresh_in_background,
                     args=(router,),
-                    name="liquid-models",
+                    name="architect-models",
                     daemon=True,
                 )
                 self._refresh.start()

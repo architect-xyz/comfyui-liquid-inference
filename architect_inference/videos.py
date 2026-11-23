@@ -19,7 +19,7 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
-from .client import Client, LiquidError, RetryableError
+from .client import ArchitectError, Client, RetryableError
 
 POLL_INTERVAL = 5.0
 # The longest that the node waits for a job to end. Most jobs end in a few
@@ -60,7 +60,7 @@ async def wait(
         except RetryableError as error:
             failures += 1
             if failures > MAX_FAILED_READS:
-                raise LiquidError(
+                raise ArchitectError(
                     f"The node could not read the status of job {job_id}: {error}. "
                     + still_charged(job_id)
                 ) from None
@@ -71,10 +71,10 @@ async def wait(
             if state == "completed":
                 return status
             if state == "failed":
-                raise LiquidError(_failure(job_id, status))
+                raise ArchitectError(_failure(job_id, status))
             report(f"Job {job_id}: {state}, {int(clock() - start)} s")
         if clock() - start >= limit:
-            raise LiquidError(
+            raise ArchitectError(
                 f"Job {job_id} did not end in {int(limit // 60)} minutes. " + still_charged(job_id)
             )
         await _sleep(interval, interrupted, job_id, clock)
@@ -96,7 +96,7 @@ async def download(
             return await asyncio.to_thread(client.video_content, job_id)
         except RetryableError as error:
             if attempt >= tries:
-                raise LiquidError(
+                raise ArchitectError(
                     f"Job {job_id} is complete and charged, but the download failed: {error}. "
                     f"To try again with no new charge, put job ID {job_id} in an "
                     "Architect Inference Video Job node."
@@ -112,7 +112,7 @@ async def _sleep(
     end = clock() + seconds
     while True:
         if interrupted():
-            raise LiquidError(
+            raise ArchitectError(
                 f"The node stopped waiting for job {job_id}. " + still_charged(job_id)
             )
         left = end - clock()
@@ -135,9 +135,9 @@ def _failure(job_id: str, status: dict[str, Any]) -> str:
 def start_image_url(batch: npt.NDArray[np.floating[Any]]) -> str:
     """Encodes a ComfyUI IMAGE batch of one image as a PNG `data:` URL."""
     if batch.ndim != 4 or batch.shape[-1] not in (3, 4):
-        raise LiquidError(f"start_image has the shape {tuple(batch.shape)}, not one image.")
+        raise ArchitectError(f"start_image has the shape {tuple(batch.shape)}, not one image.")
     if batch.shape[0] != 1:
-        raise LiquidError(
+        raise ArchitectError(
             f"start_image holds {batch.shape[0]} images. Connect one image, "
             "for example with an Image From Batch node."
         )
@@ -146,7 +146,7 @@ def start_image_url(batch: npt.NDArray[np.floating[Any]]) -> str:
     Image.fromarray(pixels).save(buffer, format="PNG")
     data = buffer.getvalue()
     if len(data) > MAX_START_IMAGE_BYTES:
-        raise LiquidError(
+        raise ArchitectError(
             f"start_image is {len(data) // (1024 * 1024)} MiB as a PNG, and the limit is 14 MiB. "
             "Make it smaller, for example with an Upscale Image node."
         )

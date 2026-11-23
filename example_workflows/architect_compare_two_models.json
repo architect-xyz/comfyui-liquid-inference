@@ -120,7 +120,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "liquid_seedream"
+        "architect_seedream"
       ]
     },
     {
@@ -149,7 +149,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "liquid_qwen_image"
+        "architect_qwen_image"
       ]
     }
   ],

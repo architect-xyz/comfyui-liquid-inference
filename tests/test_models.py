@@ -3,8 +3,8 @@ from typing import Any
 
 from stub_router import Stub, dead_base, serve
 
-from liquid_inference.client import Client
-from liquid_inference.models import (
+from architect_inference.client import Client
+from architect_inference.models import (
     IMAGES,
     VIDEOS,
     Catalog,

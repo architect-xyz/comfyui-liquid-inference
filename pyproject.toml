@@ -54,7 +54,7 @@ select = ["B", "E", "F", "I", "N", "RUF", "SIM", "UP", "W", "S102", "S307"]
 extend-ignore-names = ["INPUT_TYPES", "VALIDATE_INPUTS"]
 
 [tool.mypy]
-files = ["liquid_inference", "tests"]
+files = ["architect_inference", "tests"]
 python_version = "3.10"
 strict = true
 # Module names start at this folder, because its own name is not a valid

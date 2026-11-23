@@ -52,11 +52,11 @@ Add funds at <https://inference.ai.exchange/credits> if your balance is too low.
 3. Select **Save**.
 
 The key goes to the ComfyUI server. The server keeps it in a file in the
-ComfyUI user directory, `user/__liquid_inference/api_key`. On Linux and
+ComfyUI user directory, `user/__architect_inference/api_key`. On Linux and
 macOS, only your system user can read this file. ComfyUI does not serve
 folders whose names start with `__`.
 
-As an alternative, set the `LIQUID_API_KEY` environment variable before you
+As an alternative, set the `ARCHITECT_API_KEY` environment variable before you
 start ComfyUI. The environment variable has priority over the stored key.
 
 The nodes have no input for the key. ComfyUI writes each input value into the
@@ -148,7 +148,7 @@ video when the job is complete. The error gives the job ID.
 To get the video of a job that you paid for, use the **Architect Inference Video Job**
 node:
 
-1. Add a **Architect Inference Video Job** node.
+1. Add an **Architect Inference Video Job** node.
 2. Paste the job ID into `job_id`.
 3. Connect `video` to **Save Video**, and queue the workflow.
 
@@ -182,7 +182,7 @@ to support to find the job.
 
 | Error | What to do |
 | --- | --- |
-| No Architect Inference API key | Set the key in Settings, or set `LIQUID_API_KEY`, then try again. |
+| No Architect Inference API key | Set the key in Settings, or set `ARCHITECT_API_KEY`, then try again. |
 | `no_eligible_offer` with `retention_policy` | For a video, select `retention_policy = allowed` only if you accept content retention. Otherwise, select a different model. |
 | HTTP 401 | The exchange does not know the key. Make a new key and save it. |
 | HTTP 402 `insufficient_balance` | Add funds to your account. |
@@ -195,7 +195,7 @@ to support to find the job.
 | HTTP 502 or 504 with a web page | A proxy between ComfyUI and the exchange answered. Look at your receipts before you run the node again. |
 | The model list shows "no image models" or "no video models" | ComfyUI could not get the model list. Check the network and the base URL, then reload the page. |
 | A video job failed | The seller did not make the video, and you were not charged. Run the node again, or select a different model. |
-| The node stopped waiting for a video job | The job continues, and the exchange charges for it. Put the job ID in a **Architect Inference Video Job** node to get the video. |
+| The node stopped waiting for a video job | The job continues, and the exchange charges for it. Put the job ID in an **Architect Inference Video Job** node to get the video. |
 | HTTP 410 `video_expired` | The seller deleted the file. Look at the job's receipt for the charge. |
 | The outcome is unknown | Do not run the node again at once. Look at your receipts, or give the `Idempotency-Key` to support. |
 
@@ -205,7 +205,7 @@ offers were excluded. A refusal before the auction costs nothing.
 ## Base URL
 
 The node sends requests to `https://router.inference.ai.exchange/v1`. To use a
-different router, set **Base URL** in Settings or set the `LIQUID_BASE_URL`
+different router, set **Base URL** in Settings or set the `ARCHITECT_BASE_URL`
 environment variable.
 
 ## Development

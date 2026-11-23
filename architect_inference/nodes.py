@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 
 from . import videos
-from .client import Client, LiquidError, format_usd, receipt, video_receipt
+from .client import ArchitectError, Client, format_usd, receipt, video_receipt
 from .config import comfy_config
 from .images import decode_batch
 from .models import IMAGES, VIDEOS, Catalog, ImageModel, VideoModel, seconds_choices, size_choices
@@ -164,7 +164,7 @@ class LiquidImage:
         import torch
 
         if not prompt.strip():
-            raise LiquidError("The prompt is empty.")
+            raise ArchitectError("The prompt is empty.")
         generation = _client().generate(
             model=model,
             prompt=prompt,
@@ -175,7 +175,7 @@ class LiquidImage:
         try:
             batch = decode_batch(generation.images)
         except ValueError as error:
-            raise LiquidError(f"Job {generation.job_id} was charged, but {error}.") from None
+            raise ArchitectError(f"Job {generation.job_id} was charged, but {error}.") from None
         exchange = generation.exchange
         seller = exchange.get("provider_slug") or exchange.get("provider_id") or "unknown seller"
         charge = exchange.get("buyer_charge_usd")
@@ -298,7 +298,7 @@ class LiquidVideo:
         retention_policy: str = "none",
     ) -> tuple[Any, str, str]:
         if not prompt.strip():
-            raise LiquidError("The prompt is empty.")
+            raise ArchitectError("The prompt is empty.")
         image = None if start_image is None else videos.start_image_url(_array(start_image))
         client = _client()
         job_id = await asyncio.to_thread(

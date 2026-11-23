@@ -5,8 +5,8 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from liquid_inference.config import Config
-from liquid_inference.oauth import AUTHORITY, CLIENT_ID, SignIn
+from architect_inference.config import Config
+from architect_inference.oauth import AUTHORITY, CLIENT_ID, SignIn
 
 
 def flow(tmp_path: Path) -> tuple[SignIn, Config, list[dict[str, str]], list[float]]:
@@ -17,7 +17,7 @@ def flow(tmp_path: Path) -> tuple[SignIn, Config, list[dict[str, str]], list[flo
     def exchange(fields: dict[str, str]) -> dict[str, object]:
         calls.append(fields)
         return {
-            "access_token": "sk-liquid-test",
+            "access_token": "sk-architect-test",
             "token_type": "Bearer",
             "expires_in": 604800,
             "scope": "mcp:read mcp:spend",
@@ -45,8 +45,8 @@ def test_sign_in_uses_pkce_and_saves_the_key_only_on_the_server(tmp_path: Path) 
     )
     key = config.api_key()
     assert key is not None
-    assert key.value == "sk-liquid-test"
-    assert calls[0]["redirect_uri"] == "http://127.0.0.1:8188/liquid-inference/callback"
+    assert key.value == "sk-architect-test"
+    assert calls[0]["redirect_uri"] == "http://127.0.0.1:8188/architect-inference/callback"
     import base64
 
     challenge = (
@@ -55,7 +55,7 @@ def test_sign_in_uses_pkce_and_saves_the_key_only_on_the_server(tmp_path: Path) 
         .decode()
     )
     assert fields["code_challenge"] == challenge
-    assert "sk-liquid-test" not in json.dumps(sign_in.status())
+    assert "sk-architect-test" not in json.dumps(sign_in.status())
     with pytest.raises(ValueError):
         sign_in.finish(
             {"state": fields["state"], "iss": AUTHORITY, "code": "code"}, "http://127.0.0.1:8188"
@@ -119,6 +119,8 @@ def test_denial_and_wrong_callback_origin_do_not_save_a_key(tmp_path: Path) -> N
 
 def test_environment_key_and_custom_router_require_manual_configuration(tmp_path: Path) -> None:
     for env in [
+        {"ARCHITECT_API_KEY": "environment-key"},
+        {"ARCHITECT_BASE_URL": "http://127.0.0.1:8080/v1"},
         {"LIQUID_API_KEY": "environment-key"},
         {"LIQUID_BASE_URL": "http://127.0.0.1:8080/v1"},
     ]:
@@ -127,7 +129,7 @@ def test_environment_key_and_custom_router_require_manual_configuration(tmp_path
 
 
 def test_sign_in_start_refuses_cross_site_and_form_requests(tmp_path: Path) -> None:
-    from liquid_inference.routes import start_sign_in
+    from architect_inference.routes import start_sign_in
 
     sign_in, _, _, _ = flow(tmp_path)
     origin = "http://127.0.0.1:8188"

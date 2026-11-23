@@ -11,9 +11,9 @@ import pytest
 from PIL import Image
 from stub_router import CLIP, VIDEO_JOB, Stub, video_error, video_status
 
-from liquid_inference import __version__, nodes, videos
-from liquid_inference.client import Client, LiquidError
-from liquid_inference.models import VIDEOS, Catalog
+from architect_inference import __version__, nodes, videos
+from architect_inference.client import ArchitectError, Client
+from architect_inference.models import VIDEOS, Catalog
 
 KEY = "lq_video_key_9"
 CREATE = "/v1/videos"
@@ -108,7 +108,7 @@ def test_the_video_purchase_uses_the_selected_retention_policy(
 def test_an_invalid_retention_policy_stops_before_any_request(
     node: nodes.LiquidVideo, router: Stub
 ) -> None:
-    with pytest.raises(LiquidError, match="retention_policy"):
+    with pytest.raises(ArchitectError, match="retention_policy"):
         buy(node, retention_policy="all")
     assert router.requests == []
 
@@ -127,7 +127,7 @@ def test_a_start_image_goes_as_one_png_data_url(node: nodes.LiquidVideo, router:
 def test_a_batch_of_two_start_images_is_refused_before_any_request(
     node: nodes.LiquidVideo, router: Stub
 ) -> None:
-    with pytest.raises(LiquidError, match="holds 2 images"):
+    with pytest.raises(ArchitectError, match="holds 2 images"):
         buy(node, start_image=np.zeros((2, 6, 8, 3), dtype=np.float32))
     assert router.requests == []
 
@@ -135,7 +135,7 @@ def test_a_batch_of_two_start_images_is_refused_before_any_request(
 def test_a_create_that_times_out_is_not_sent_again(router: Stub) -> None:
     router.delay = 1.0
     client = Client(f"{router.base}/v1", KEY, timeout=0.2)
-    with pytest.raises(LiquidError, match="outcome is unknown") as error:
+    with pytest.raises(ArchitectError, match="outcome is unknown") as error:
         client.create_video(
             model="m", prompt="p", size=None, seconds=None, start_image=None, cap_usd=1.0
         )
@@ -162,7 +162,7 @@ def test_failed_reads_are_tried_again_and_the_clip_still_comes(
 def test_too_many_failed_reads_stop_with_the_job_id(router: Stub, client: Client) -> None:
     router.answer_statuses(video_error("storage_unavailable"))
     with pytest.raises(
-        LiquidError, match=f"put job ID {VIDEO_JOB} in an Architect Inference Video Job node"
+        ArchitectError, match=f"put job ID {VIDEO_JOB} in an Architect Inference Video Job node"
     ):
         wait(client)
     assert len(router.calls(STATUS)) == videos.MAX_FAILED_READS + 1
@@ -172,27 +172,27 @@ def test_a_failed_job_says_that_it_costs_nothing(router: Stub, client: Client) -
     router.answer_statuses(
         video_status("failed", error={"code": "content_policy", "message": "refused"})
     )
-    with pytest.raises(LiquidError, match=r"\(content_policy\): refused\. A failed job costs"):
+    with pytest.raises(ArchitectError, match=r"\(content_policy\): refused\. A failed job costs"):
         wait(client)
 
 
 def test_a_read_that_the_exchange_refuses_is_not_tried_again(router: Stub, client: Client) -> None:
     router.contents = [video_error("video_expired", 410)]
-    with pytest.raises(LiquidError, match="video_expired"):
+    with pytest.raises(ArchitectError, match="video_expired"):
         download(client)
     assert len(router.calls(CONTENT)) == 1
 
 
 def test_a_stop_ends_the_wait_and_names_the_job(router: Stub, client: Client) -> None:
     router.answer_statuses(video_status("in_progress"))
-    with pytest.raises(LiquidError, match=f"stopped waiting for job {VIDEO_JOB}"):
+    with pytest.raises(ArchitectError, match=f"stopped waiting for job {VIDEO_JOB}"):
         asyncio.run(videos.wait(client, VIDEO_JOB, interrupted=lambda: True, report=lambda _: None))
     assert len(router.calls(STATUS)) == 1
 
 
 def test_a_job_that_does_not_end_in_time_names_the_job(router: Stub, client: Client) -> None:
     router.answer_statuses(video_status("in_progress"))
-    with pytest.raises(LiquidError, match=f"Job {VIDEO_JOB} did not end"):
+    with pytest.raises(ArchitectError, match=f"Job {VIDEO_JOB} did not end"):
         wait(client, limit=0.0)
 
 

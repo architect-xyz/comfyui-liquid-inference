@@ -116,7 +116,7 @@ def _dynamic(name: str, options: dict[str, Any], values: list[Any]) -> dict[str,
 @pytest.fixture(scope="module")
 def comfyui() -> Iterator[tuple[str, Path, Path, Stub]]:
     keep = os.environ.get("INFERENCE_SMOKE_DIR")
-    root = Path(keep) if keep else Path(tempfile.mkdtemp(prefix="liquid-smoke-"))
+    root = Path(keep) if keep else Path(tempfile.mkdtemp(prefix="architect-smoke-"))
     root.mkdir(parents=True, exist_ok=True)
     python = install(root)
     nodes = root / "ComfyUI" / "custom_nodes" / "liquid-inference"
@@ -131,8 +131,8 @@ def comfyui() -> Iterator[tuple[str, Path, Path, Stub]]:
     with serve() as stub:
         env = {
             **os.environ,
-            "LIQUID_BASE_URL": f"{stub.base}/v1",
-            "LIQUID_API_KEY": SENTINEL,
+            "ARCHITECT_BASE_URL": f"{stub.base}/v1",
+            "ARCHITECT_API_KEY": SENTINEL,
         }
         env.pop("PYTHONPATH", None)
         log = (run_dir / "comfyui.log").open("w")
@@ -189,7 +189,7 @@ def test_the_node_loads_without_import_errors(comfyui: tuple[str, Path, Path, St
     assert "LiquidVideoJob" in get(f"{base}/object_info")
     log = (run_dir / "comfyui.log").read_text()
     assert "IMPORT FAILED" not in log, log
-    with urllib.request.urlopen(f"{base}/extensions/liquid-inference/liquid.js") as script:
+    with urllib.request.urlopen(f"{base}/extensions/liquid-inference/architect.js") as script:
         assert b"registerExtension" in script.read()
 
 
@@ -319,13 +319,13 @@ def test_the_settings_route_stores_the_key_in_a_private_file(
 ) -> None:
     base, _, run_dir, _ = comfyui
     stored = SENTINEL + "_stored"
-    answer = post(f"{base}/api/liquid-inference/key", {"api_key": stored})
+    answer = post(f"{base}/api/architect-inference/key", {"api_key": stored})
     assert stored not in json.dumps(answer)
-    key_file = run_dir / "user" / "__liquid_inference" / "api_key"
+    key_file = run_dir / "user" / "__architect_inference" / "api_key"
     assert key_file.read_text() == stored
     assert stat.S_IMODE(key_file.stat().st_mode) == 0o600
     form = urllib.request.Request(
-        f"{base}/liquid-inference/key",
+        f"{base}/architect-inference/key",
         data=b"api_key=x",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
@@ -333,16 +333,16 @@ def test_the_settings_route_stores_the_key_in_a_private_file(
     with pytest.raises(urllib.error.HTTPError) as refused:
         urllib.request.urlopen(form, timeout=10)
     assert refused.value.code == 415
-    post(f"{base}/liquid-inference/key", {"api_key": ""})
+    post(f"{base}/architect-inference/key", {"api_key": ""})
     assert not key_file.exists()
 
 
 def test_no_server_answer_holds_the_key(comfyui: tuple[str, Path, Path, Stub]) -> None:
     base, _, run_dir, _ = comfyui
-    status = get(f"{base}/liquid-inference/status")
+    status = get(f"{base}/architect-inference/status")
     assert status["key_set"] is True
     assert status["key_source"] == "environment"
-    for route in ["/liquid-inference/status", "/object_info", "/history"]:
+    for route in ["/architect-inference/status", "/object_info", "/history"]:
         with urllib.request.urlopen(f"{base}{route}", timeout=10) as response:
             assert SENTINEL not in response.read().decode()
     for file in (run_dir / "user").rglob("*"):

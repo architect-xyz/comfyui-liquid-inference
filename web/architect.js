@@ -8,7 +8,7 @@ import { api } from "../../scripts/api.js";
 import { priceBadge } from "./prices.js";
 
 async function getStatus() {
-  const response = await api.fetchApi("/liquid-inference/status");
+  const response = await api.fetchApi("/architect-inference/status");
   return response.json();
 }
 
@@ -25,12 +25,16 @@ async function post(path, body) {
 
 function keyText(status) {
   if (status.key_expired) return "Key expired. Select Sign in again";
-  if (status.key_source === "environment") return "Set by LIQUID_API_KEY";
+  if (status.key_source === "environment") {
+    return `Set by ${status.key_env ?? "ARCHITECT_API_KEY"}`;
+  }
   return status.key_set ? "A key is saved" : "No key";
 }
 
 function baseUrlText(status) {
-  if (status.base_url_source === "environment") return "Set by LIQUID_BASE_URL";
+  if (status.base_url_source === "environment") {
+    return `Set by ${status.base_url_env ?? "ARCHITECT_BASE_URL"}`;
+  }
   return status.base_url_source === "settings" ? "Saved" : "Default";
 }
 
@@ -86,7 +90,7 @@ function field({ type, placeholder, describe, save, initial, signIn = false }) {
       popup.opener = null;
       signInButton.disabled = true;
       try {
-        const { url } = await post("/liquid-inference/sign-in", {});
+        const { url } = await post("/architect-inference/sign-in", {});
         popup.location.replace(url);
         note.textContent = "Complete sign-in in the new page.";
         const deadline = Date.now() + 10 * 60 * 1000;
@@ -112,10 +116,10 @@ function field({ type, placeholder, describe, save, initial, signIn = false }) {
 }
 
 app.registerExtension({
-  name: "LiquidInference.Settings",
+  name: "ArchitectInference.Settings",
   settings: [
     {
-      id: "LiquidInference.ApiKey",
+      id: "ArchitectInference.ApiKey",
       category: ["Architect Inference", "Account", "API key"],
       name: "API key",
       tooltip:
@@ -127,12 +131,12 @@ app.registerExtension({
           signIn: true,
           placeholder: "Paste a key, then Save",
           describe: keyText,
-          save: (value) => post("/liquid-inference/key", { api_key: value }),
+          save: (value) => post("/architect-inference/key", { api_key: value }),
           initial: (input) => (input.value = ""),
         }),
     },
     {
-      id: "LiquidInference.BaseUrl",
+      id: "ArchitectInference.BaseUrl",
       category: ["Architect Inference", "Account", "Base URL"],
       name: "Base URL",
       tooltip: "The router address. Clear it to use https://router.inference.ai.exchange/v1.",
@@ -142,7 +146,7 @@ app.registerExtension({
           type: "url",
           placeholder: "https://router.inference.ai.exchange/v1",
           describe: baseUrlText,
-          save: (value) => post("/liquid-inference/base-url", { base_url: value }),
+          save: (value) => post("/architect-inference/base-url", { base_url: value }),
           initial: (input, status) => (input.value = status.base_url),
         }),
     },
@@ -156,7 +160,7 @@ let priceReadAt = 0;
 function refreshPrices() {
   if (priceRequest || Date.now() - priceReadAt < 60000) return;
   priceReadAt = Date.now();
-  priceRequest = api.fetchApi("/liquid-inference/prices")
+  priceRequest = api.fetchApi("/architect-inference/prices")
     .then((response) => {
       if (!response.ok) throw new Error("Price unavailable");
       return response.json();
@@ -170,12 +174,12 @@ function refreshPrices() {
 }
 
 app.registerExtension({
-  name: "LiquidInference.Prices",
+  name: "ArchitectInference.Prices",
   nodeCreated(node) {
     if (!["LiquidImage", "LiquidVideo"].includes(node.comfyClass)) return;
     node.addCustomWidget({
-      name: "liquid_price",
-      type: "liquid_price",
+      name: "architect_price",
+      type: "architect_price",
       options: { serialize: false },
       computeSize: (width) => [width, 26],
       draw(ctx, currentNode, width, y) {
@@ -186,7 +190,8 @@ app.registerExtension({
         }
         const badge = priceBadge(priceDirectory, currentNode.comfyClass, values);
         ctx.save();
-        ctx.fillStyle = badge.low ? "#ef7777" : "#c9d9c9";
+        // Dark-theme `danger` and `ink-2` colors from the Architect brand tokens.
+        ctx.fillStyle = badge.low ? "#E3938B" : "#A3A8AE";
         ctx.font = "12px sans-serif";
         ctx.fillText(badge.text, 10, y + 17, width - 20);
         ctx.restore();

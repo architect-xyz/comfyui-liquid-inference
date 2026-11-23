@@ -23,7 +23,7 @@ from .config import DEFAULT_BASE_URL, Config
 AUTHORITY = "https://gateway.inference.ai.exchange"
 CLIENT_ID = "https://inference.ai.exchange/oauth/comfyui.json"
 RESOURCE = "https://router.inference.ai.exchange"
-CALLBACK = "/liquid-inference/callback"
+CALLBACK = "/architect-inference/callback"
 TTL = 600
 
 

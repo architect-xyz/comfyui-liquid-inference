@@ -41,9 +41,16 @@ class Config:
     wrote in `directory`.
     """
 
-    def __init__(self, directory: Path, environ: Mapping[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        directory: Path,
+        environ: Mapping[str, str] | None = None,
+        *,
+        legacy_directory: Path | None = None,
+    ) -> None:
         self.directory = directory
         self.environ = os.environ if environ is None else environ
+        self.legacy_directory = legacy_directory
 
     @property
     def key_file(self) -> Path:
@@ -53,12 +60,39 @@ class Config:
     def base_url_file(self) -> Path:
         return self.directory / "base_url"
 
-    def api_key(self) -> Setting | None:
-        key = (self.environ.get(KEY_ENV) or self.environ.get(LEGACY_KEY_ENV) or "").strip()
-        if key:
-            return Setting(key, "environment")
+    def _legacy_file(self, name: str) -> Path | None:
+        return self.legacy_directory / name if self.legacy_directory is not None else None
+
+    def _env_value(self, primary: str, legacy: str) -> tuple[str, str] | None:
+        for name in (primary, legacy):
+            value = (self.environ.get(name) or "").strip()
+            if value:
+                return value, name
+        return None
+
+    def _stored_key(self) -> tuple[str, Path] | None:
         key = _read(self.key_file)
-        return Setting(key, "settings") if key else None
+        if key:
+            return key, self.directory
+        legacy = self._legacy_file("api_key")
+        if legacy is not None:
+            key = _read(legacy)
+            if key and self.legacy_directory is not None:
+                return key, self.legacy_directory
+        return None
+
+    def _unlink_legacy(self, *names: str) -> None:
+        if self.legacy_directory is None:
+            return
+        for name in names:
+            (self.legacy_directory / name).unlink(missing_ok=True)
+
+    def api_key(self) -> Setting | None:
+        env = self._env_value(KEY_ENV, LEGACY_KEY_ENV)
+        if env is not None:
+            return Setting(env[0], "environment")
+        stored = self._stored_key()
+        return Setting(stored[0], "settings") if stored is not None else None
 
     def set_api_key(self, key: str, *, expires_at: float | None = None) -> None:
         """Stores the key, or deletes the stored key when `key` is empty."""
@@ -66,6 +100,7 @@ class Config:
         if not key:
             self.key_file.unlink(missing_ok=True)
             (self.directory / "key_expiry.json").unlink(missing_ok=True)
+            self._unlink_legacy("api_key", "key_expiry.json")
             return
         if len(key) > MAX_KEY_LENGTH or any(c.isspace() or not c.isprintable() for c in key):
             raise ValueError("the API key has characters that a key cannot have")
@@ -80,29 +115,36 @@ class Config:
                     {"key_hash": hashlib.sha256(key.encode()).hexdigest(), "expires_at": expires_at}
                 ),
             )
+        self._unlink_legacy("api_key", "key_expiry.json")
 
     def key_expired(self, *, now: float | None = None) -> bool:
-        key = self.api_key()
-        if key is None or key.source == "environment":
+        if self._env_value(KEY_ENV, LEGACY_KEY_ENV) is not None:
             return False
+        stored = self._stored_key()
+        if stored is None:
+            return False
+        key_value, owner = stored
         try:
-            expiry = json.loads((self.directory / "key_expiry.json").read_text())
+            expiry = json.loads((owner / "key_expiry.json").read_text())
             return bool(
-                expiry["key_hash"] == hashlib.sha256(key.value.encode()).hexdigest()
+                expiry["key_hash"] == hashlib.sha256(key_value.encode()).hexdigest()
                 and (time.time() if now is None else now) >= expiry["expires_at"]
             )
         except (FileNotFoundError, ValueError, KeyError, TypeError):
             return False
 
     def base_url(self) -> Setting:
-        url = (
-            self.environ.get(BASE_URL_ENV) or self.environ.get(LEGACY_BASE_URL_ENV) or ""
-        ).strip()
-        if url:
-            return Setting(normalize_base_url(url), "environment")
+        env = self._env_value(BASE_URL_ENV, LEGACY_BASE_URL_ENV)
+        if env is not None:
+            return Setting(normalize_base_url(env[0]), "environment")
         url = _read(self.base_url_file)
         if url:
             return Setting(normalize_base_url(url), "settings")
+        legacy = self._legacy_file("base_url")
+        if legacy is not None:
+            url = _read(legacy)
+            if url:
+                return Setting(normalize_base_url(url), "settings")
         return Setting(DEFAULT_BASE_URL, "default")
 
     def set_base_url(self, url: str) -> None:
@@ -110,19 +152,25 @@ class Config:
         url = url.strip()
         if not url:
             self.base_url_file.unlink(missing_ok=True)
+            self._unlink_legacy("base_url")
             return
         self._write(self.base_url_file, normalize_base_url(url))
+        self._unlink_legacy("base_url")
 
     def status(self) -> dict[str, object]:
         """Tells where the key and the base URL come from. It never holds the key."""
+        key_env = self._env_value(KEY_ENV, LEGACY_KEY_ENV)
+        base_url_env = self._env_value(BASE_URL_ENV, LEGACY_BASE_URL_ENV)
         key = self.api_key()
         base_url = self.base_url()
         return {
             "key_set": key is not None,
             "key_expired": self.key_expired(),
             "key_source": key.source if key else None,
+            "key_env": key_env[1] if key_env is not None else None,
             "base_url": base_url.value,
             "base_url_source": base_url.source,
+            "base_url_env": base_url_env[1] if base_url_env is not None else None,
         }
 
     def _write(self, path: Path, text: str) -> None:
@@ -165,5 +213,12 @@ def comfy_config() -> Config:
 
     system_directory = getattr(folder_paths, "get_system_user_directory", None)
     if system_directory is not None:
-        return Config(Path(system_directory("liquid_inference")))
-    return Config(Path(folder_paths.get_user_directory()) / "__liquid_inference")
+        return Config(
+            Path(system_directory("architect_inference")),
+            legacy_directory=Path(system_directory("liquid_inference")),
+        )
+    user_directory = Path(folder_paths.get_user_directory())
+    return Config(
+        user_directory / "__architect_inference",
+        legacy_directory=user_directory / "__liquid_inference",
+    )
