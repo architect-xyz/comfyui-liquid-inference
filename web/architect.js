@@ -176,7 +176,7 @@ function refreshPrices() {
 app.registerExtension({
   name: "ArchitectInference.Prices",
   nodeCreated(node) {
-    if (!["LiquidImage", "LiquidVideo"].includes(node.comfyClass)) return;
+    if (!["ArchitectImage", "ArchitectVideo", "LiquidImage", "LiquidVideo"].includes(node.comfyClass)) return;
     node.addCustomWidget({
       name: "architect_price",
       type: "architect_price",

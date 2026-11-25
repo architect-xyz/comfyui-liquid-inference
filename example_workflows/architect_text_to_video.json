@@ -6,7 +6,7 @@
   "nodes": [
     {
       "id": 1,
-      "type": "LiquidVideo",
+      "type": "ArchitectVideo",
       "pos": [
         50,
         100
@@ -39,7 +39,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "LiquidVideo"
+        "Node name for S&R": "ArchitectVideo"
       },
       "widgets_values": [
         "A red fox runs through fresh snow at sunrise, slow camera pan, soft light",

@@ -29,14 +29,14 @@ def client(router: Stub) -> Client:
 @pytest.fixture
 def node(
     router: Stub, client: Client, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> nodes.LiquidVideo:
+) -> nodes.ArchitectVideo:
     catalog = Catalog(lambda: client, tmp_path / "video_models.json", VIDEOS)
     monkeypatch.setattr(nodes, "_client", lambda: client)
     monkeypatch.setattr(nodes, "_video_catalog", lambda: catalog)
     monkeypatch.setattr(nodes, "_interrupted", lambda: False)
     # VideoFromFile is ComfyUI's. The tests keep the bytes.
     monkeypatch.setattr(nodes, "_video", lambda data: data)
-    return nodes.LiquidVideo()
+    return nodes.ArchitectVideo()
 
 
 def wait(client: Client, **options: Any) -> dict[str, Any]:
@@ -50,7 +50,7 @@ def download(client: Client) -> bytes:
     return asyncio.run(videos.download(client, VIDEO_JOB, interrupted=lambda: False, pause=0.0))
 
 
-def buy(node: nodes.LiquidVideo, **overrides: Any) -> tuple[Any, str, str]:
+def buy(node: nodes.ArchitectVideo, **overrides: Any) -> tuple[Any, str, str]:
     inputs: dict[str, Any] = {
         "prompt": "a red square",
         "model": "google/veo-3.1",
@@ -63,7 +63,7 @@ def buy(node: nodes.LiquidVideo, **overrides: Any) -> tuple[Any, str, str]:
 
 
 def test_one_purchase_then_reads_until_the_file_comes(
-    node: nodes.LiquidVideo, router: Stub
+    node: nodes.ArchitectVideo, router: Stub
 ) -> None:
     video, job_id, receipt = buy(node, size="1280x720", seconds="4")
     (create,) = router.calls(CREATE)
@@ -88,7 +88,7 @@ def test_one_purchase_then_reads_until_the_file_comes(
     }
 
 
-def test_auto_omits_the_size_and_the_length(node: nodes.LiquidVideo, router: Stub) -> None:
+def test_auto_omits_the_size_and_the_length(node: nodes.ArchitectVideo, router: Stub) -> None:
     buy(node)
     (create,) = router.calls(CREATE)
     assert "size" not in create.json()
@@ -97,7 +97,7 @@ def test_auto_omits_the_size_and_the_length(node: nodes.LiquidVideo, router: Stu
 
 @pytest.mark.parametrize("policy", ["none", "allowed"])
 def test_the_video_purchase_uses_the_selected_retention_policy(
-    node: nodes.LiquidVideo, router: Stub, policy: str
+    node: nodes.ArchitectVideo, router: Stub, policy: str
 ) -> None:
     video, _, _ = buy(node, retention_policy=policy)
     (create,) = router.calls(CREATE)
@@ -106,14 +106,14 @@ def test_the_video_purchase_uses_the_selected_retention_policy(
 
 
 def test_an_invalid_retention_policy_stops_before_any_request(
-    node: nodes.LiquidVideo, router: Stub
+    node: nodes.ArchitectVideo, router: Stub
 ) -> None:
     with pytest.raises(ArchitectError, match="retention_policy"):
         buy(node, retention_policy="all")
     assert router.requests == []
 
 
-def test_a_start_image_goes_as_one_png_data_url(node: nodes.LiquidVideo, router: Stub) -> None:
+def test_a_start_image_goes_as_one_png_data_url(node: nodes.ArchitectVideo, router: Stub) -> None:
     frame = np.zeros((1, 6, 8, 3), dtype=np.float32)
     frame[0, :, :, 0] = 1.0
     buy(node, start_image=frame)
@@ -125,7 +125,7 @@ def test_a_start_image_goes_as_one_png_data_url(node: nodes.LiquidVideo, router:
 
 
 def test_a_batch_of_two_start_images_is_refused_before_any_request(
-    node: nodes.LiquidVideo, router: Stub
+    node: nodes.ArchitectVideo, router: Stub
 ) -> None:
     with pytest.raises(ArchitectError, match="holds 2 images"):
         buy(node, start_image=np.zeros((2, 6, 8, 3), dtype=np.float32))
@@ -197,28 +197,28 @@ def test_a_job_that_does_not_end_in_time_names_the_job(router: Stub, client: Cli
 
 
 def test_the_job_node_gets_the_video_without_a_purchase(
-    node: nodes.LiquidVideo, router: Stub
+    node: nodes.ArchitectVideo, router: Stub
 ) -> None:
-    video, receipt = asyncio.run(nodes.LiquidVideoJob().load(f" {VIDEO_JOB} "))
+    video, receipt = asyncio.run(nodes.ArchitectVideoJob().load(f" {VIDEO_JOB} "))
     assert video == CLIP
     assert json.loads(receipt)["job_id"] == VIDEO_JOB
     assert router.calls(CREATE) == []
-    assert nodes.LiquidVideoJob.VALIDATE_INPUTS("") is not True
-    assert nodes.LiquidVideoJob.VALIDATE_INPUTS("../../account") is not True
+    assert nodes.ArchitectVideoJob.VALIDATE_INPUTS("") is not True
+    assert nodes.ArchitectVideoJob.VALIDATE_INPUTS("../../account") is not True
 
 
 def test_the_inputs_list_the_video_models_and_no_input_can_hold_a_key(
-    node: nodes.LiquidVideo,
+    node: nodes.ArchitectVideo,
 ) -> None:
-    inputs = nodes.LiquidVideo.INPUT_TYPES()
+    inputs = nodes.ArchitectVideo.INPUT_TYPES()
     widgets = {name: spec for group in inputs.values() for name, spec in group.items()}
     assert widgets["model"][0] == ["google/veo-3.1", "kling/kling-2.5"]
     assert widgets["seconds"][0] == ["auto", "4", "5", "8", "10"]
     for name in widgets:
         assert not re.search("key|token|secret|auth|password", name, re.IGNORECASE)
-    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", "31") is not True
-    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", "30") is True
-    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "1080x1920", "12") is True
+    assert nodes.ArchitectVideo.VALIDATE_INPUTS("m", "auto", "31") is not True
+    assert nodes.ArchitectVideo.VALIDATE_INPUTS("m", "auto", "30") is True
+    assert nodes.ArchitectVideo.VALIDATE_INPUTS("m", "1080x1920", "12") is True
 
 
 def test_the_node_takes_the_length_limit_of_the_exchange() -> None:
@@ -229,5 +229,5 @@ def test_the_node_takes_the_length_limit_of_the_exchange() -> None:
     match = re.search(r"pub const MAX_SECONDS: u32 = (\d+);", source)
     assert match is not None
     limit = int(match.group(1))
-    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", str(limit)) is True
-    assert nodes.LiquidVideo.VALIDATE_INPUTS("m", "auto", str(limit + 1)) is not True
+    assert nodes.ArchitectVideo.VALIDATE_INPUTS("m", "auto", str(limit)) is True
+    assert nodes.ArchitectVideo.VALIDATE_INPUTS("m", "auto", str(limit + 1)) is not True

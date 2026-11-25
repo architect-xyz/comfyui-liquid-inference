@@ -1,5 +1,5 @@
 export function priceBadge(directory, kind, values) {
-  const video = kind === "LiquidVideo";
+  const video = kind === "ArchitectVideo" || kind === "LiquidVideo";
   const model = (directory?.[video ? "videos" : "images"] ?? [])
     .find((entry) => entry.id === values.model);
   const rate = model?.[video ? "rate_per_video_second_usd" : "rate_per_image_usd"];

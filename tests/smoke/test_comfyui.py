@@ -30,8 +30,8 @@ from stub_router import Stub, serve
 
 PACKAGE = Path(__file__).resolve().parents[2]
 WORKFLOWS = sorted((PACKAGE / "example_workflows").glob("*.json"))
-IMAGE_WORKFLOWS = [p for p in WORKFLOWS if '"LiquidImage"' in p.read_text()]
-VIDEO_WORKFLOWS = [p for p in WORKFLOWS if '"LiquidVideo"' in p.read_text()]
+IMAGE_WORKFLOWS = [p for p in WORKFLOWS if '"ArchitectImage"' in p.read_text()]
+VIDEO_WORKFLOWS = [p for p in WORKFLOWS if '"ArchitectVideo"' in p.read_text()]
 # A real MP4 of 8 frames, so that Save Video can read it.
 CLIP = (PACKAGE / "tests" / "fixtures" / "clip.mp4").read_bytes()
 SENTINEL = "lq_smoke_sentinel_" + uuid.uuid4().hex
@@ -39,7 +39,7 @@ WIDGET_TYPES = {"INT", "FLOAT", "STRING", "BOOLEAN", "COMBO"}
 # A combo whose value adds inputs, such as `format` of Save Video. The API
 # names an added input `<combo>.<input>`.
 DYNAMIC_COMBO = "COMFY_DYNAMICCOMBO_V3"
-INFERENCE_NODES = {"LiquidImage", "LiquidVideo"}
+INFERENCE_NODES = {"ArchitectImage", "ArchitectVideo"}
 
 pytestmark = pytest.mark.smoke
 
@@ -180,13 +180,13 @@ def comfyui() -> Iterator[tuple[str, Path, Path, Stub]]:
 
 def test_the_node_loads_without_import_errors(comfyui: tuple[str, Path, Path, Stub]) -> None:
     base, _, run_dir, _ = comfyui
-    info = get(f"{base}/object_info/LiquidImage")["LiquidImage"]
+    info = get(f"{base}/object_info/ArchitectImage")["ArchitectImage"]
     assert info["display_name"] == "Architect Inference Image (paid API)"
     assert "blackforestlabs/flux-schnell" in info["input"]["required"]["model"][0]
-    info = get(f"{base}/object_info/LiquidVideo")["LiquidVideo"]
+    info = get(f"{base}/object_info/ArchitectVideo")["ArchitectVideo"]
     assert info["output"] == ["VIDEO", "STRING", "STRING"]
     assert "google/veo-3.1" in info["input"]["required"]["model"][0]
-    assert "LiquidVideoJob" in get(f"{base}/object_info")
+    assert "ArchitectVideoJob" in get(f"{base}/object_info")
     log = (run_dir / "comfyui.log").read_text()
     assert "IMPORT FAILED" not in log, log
     with urllib.request.urlopen(f"{base}/extensions/liquid-inference/architect.js") as script:
@@ -246,7 +246,7 @@ def test_an_example_workflow_saves_images_without_the_key(
     status = queue(base, prompt, workflow)
     assert status["status_str"] == "success", json.dumps(status)
 
-    liquid_nodes = sum(1 for node in workflow["nodes"] if node["type"] == "LiquidImage")
+    liquid_nodes = sum(1 for node in workflow["nodes"] if node["type"] == "ArchitectImage")
     posts = stub.calls("/v1/images/generations")[posts_before:]
     assert len(posts) == liquid_nodes
     for request in posts:
@@ -276,7 +276,7 @@ def test_an_example_workflow_saves_a_video_without_the_key(
     stub.contents = [(200, CLIP)]
     workflow, prompt = example(base, path)
     for node in prompt.values():
-        if node["class_type"] == "LiquidVideo":
+        if node["class_type"] == "ArchitectVideo":
             if retention_policy is None:
                 node["inputs"].pop("retention_policy")
             else:
@@ -306,7 +306,7 @@ def test_a_second_queue_with_the_same_inputs_does_not_buy_again(
     path = PACKAGE / "example_workflows" / "architect_text_to_image.json"
     workflow, prompt = example(base, path)
     for node in prompt.values():
-        if node["class_type"] == "LiquidImage":
+        if node["class_type"] == "ArchitectImage":
             node["inputs"]["prompt"] += " again"
     assert queue(base, prompt, workflow)["status_str"] == "success"
     posts = len(stub.calls("/v1/images/generations"))

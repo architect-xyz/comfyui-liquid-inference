@@ -16,29 +16,29 @@ KEY = "lq_node_key_7"
 
 
 @pytest.fixture
-def node(router: Stub, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> nodes.LiquidImage:
+def node(router: Stub, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> nodes.ArchitectImage:
     # torch is large, and the node only calls `torch.from_numpy`.
     monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(from_numpy=lambda a: a))
     client = Client(f"{router.base}/v1", KEY)
     catalog = Catalog(lambda: client, tmp_path / "models.json", IMAGES)
     monkeypatch.setattr(nodes, "_client", lambda: client)
     monkeypatch.setattr(nodes, "_catalog", lambda: catalog)
-    return nodes.LiquidImage()
+    return nodes.ArchitectImage()
 
 
 def widgets() -> dict[str, Any]:
-    inputs: dict[str, Any] = nodes.LiquidImage.INPUT_TYPES()
+    inputs: dict[str, Any] = nodes.ArchitectImage.INPUT_TYPES()
     return {name: spec for group in inputs.values() for name, spec in group.items()}
 
 
-def test_no_input_can_hold_a_key(node: nodes.LiquidImage) -> None:
+def test_no_input_can_hold_a_key(node: nodes.ArchitectImage) -> None:
     names = set(widgets())
     assert names == {"prompt", "model", "size", "n", "cap_usd", "unique_id"}
     for name in names:
         assert not re.search("key|token|secret|auth|password", name, re.IGNORECASE)
 
 
-def test_the_inputs_list_the_image_models_and_their_sizes(node: nodes.LiquidImage) -> None:
+def test_the_inputs_list_the_image_models_and_their_sizes(node: nodes.ArchitectImage) -> None:
     inputs = widgets()
     assert inputs["model"][0] == [
         "blackforestlabs/flux-schnell",
@@ -57,16 +57,16 @@ def test_with_no_list_the_model_input_shows_a_placeholder(
         nodes, "_catalog", lambda: Catalog(lambda: client, tmp_path / "m.json", IMAGES)
     )
     assert widgets()["model"][0] == [nodes.NO_MODELS]
-    assert nodes.LiquidImage.VALIDATE_INPUTS(nodes.NO_MODELS, "auto") is not True
+    assert nodes.ArchitectImage.VALIDATE_INPUTS(nodes.NO_MODELS, "auto") is not True
 
 
 def test_validation_accepts_a_model_the_local_list_does_not_have() -> None:
-    assert nodes.LiquidImage.VALIDATE_INPUTS("new/model", "2048x2048") is True
-    assert nodes.LiquidImage.VALIDATE_INPUTS("new/model", "huge") is not True
+    assert nodes.ArchitectImage.VALIDATE_INPUTS("new/model", "2048x2048") is True
+    assert nodes.ArchitectImage.VALIDATE_INPUTS("new/model", "huge") is not True
 
 
 def test_auto_omits_the_size_and_the_outputs_hold_the_job(
-    node: nodes.LiquidImage, router: Stub
+    node: nodes.ArchitectImage, router: Stub
 ) -> None:
     images, job_id, receipt = node.generate("a cat", "openai/gpt-image", "auto", 2, 0.05)
     node.generate("a cat", "openai/gpt-image", "1024x1024", 1, 0.05)
@@ -95,7 +95,7 @@ def test_the_version_matches_the_project() -> None:
 
 
 def test_image_status_shows_the_seller_charge_cap_and_job(
-    node: nodes.LiquidImage, monkeypatch: pytest.MonkeyPatch
+    node: nodes.ArchitectImage, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     reports: list[str] = []
     monkeypatch.setattr(nodes, "_reporter", lambda node_id: reports.append)

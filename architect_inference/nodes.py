@@ -87,7 +87,7 @@ async def _finish(client: Client, job_id: str, node_id: str | None) -> tuple[Any
     return _video(data), video_receipt(status)
 
 
-class LiquidImage:
+class ArchitectImage:
     CATEGORY = "Architect Inference"
     FUNCTION = "generate"
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
@@ -190,7 +190,7 @@ class LiquidImage:
         )
 
 
-class LiquidVideo:
+class ArchitectVideo:
     CATEGORY = "Architect Inference"
     FUNCTION = "generate"
     RETURN_TYPES = ("VIDEO", "STRING", "STRING")
@@ -317,7 +317,7 @@ class LiquidVideo:
         return video, job_id, summary
 
 
-class LiquidVideoJob:
+class ArchitectVideoJob:
     CATEGORY = "Architect Inference"
     FUNCTION = "load"
     RETURN_TYPES = ("VIDEO", "STRING")
@@ -358,13 +358,37 @@ class LiquidVideoJob:
         return await _finish(_client(), job_id.strip(), unique_id)
 
 
+class LiquidImage(ArchitectImage):
+    """The old name of `ArchitectImage`. A saved workflow still loads by it."""
+
+    DEPRECATED = True
+
+
+class LiquidVideo(ArchitectVideo):
+    """The old name of `ArchitectVideo`."""
+
+    DEPRECATED = True
+
+
+class LiquidVideoJob(ArchitectVideoJob):
+    """The old name of `ArchitectVideoJob`."""
+
+    DEPRECATED = True
+
+
 NODE_CLASS_MAPPINGS = {
+    "ArchitectImage": ArchitectImage,
+    "ArchitectVideo": ArchitectVideo,
+    "ArchitectVideoJob": ArchitectVideoJob,
     "LiquidImage": LiquidImage,
     "LiquidVideo": LiquidVideo,
     "LiquidVideoJob": LiquidVideoJob,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LiquidImage": "Architect Inference Image (paid API)",
-    "LiquidVideo": "Architect Inference Video (paid API)",
-    "LiquidVideoJob": "Architect Inference Video Job",
+    "ArchitectImage": "Architect Inference Image (paid API)",
+    "ArchitectVideo": "Architect Inference Video (paid API)",
+    "ArchitectVideoJob": "Architect Inference Video Job",
+    "LiquidImage": "Architect Inference Image (old name)",
+    "LiquidVideo": "Architect Inference Video (old name)",
+    "LiquidVideoJob": "Architect Inference Video Job (old name)",
 }

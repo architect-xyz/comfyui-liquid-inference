@@ -6,7 +6,7 @@
   "nodes": [
     {
       "id": 1,
-      "type": "LiquidImage",
+      "type": "ArchitectImage",
       "pos": [
         50,
         100
@@ -39,7 +39,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "LiquidImage"
+        "Node name for S&R": "ArchitectImage"
       },
       "widgets_values": [
         "A red fox in fresh snow at sunrise, soft light, photograph",
